@@ -10,6 +10,11 @@
       "name": "deutsch-loop",
       "source": "./",
       "description": "A German tutor that remembers your mistakes, brings each one back in a new sentence, and keeps the hint that helped."
+    },
+    {
+      "name": "nochmal",
+      "source": "./mods/nochmal",
+      "description": "Claude Code companion: what is due in the status line, a FehlerDNA card while Claude works, a live FehlerDNA pane, and a roleplay scene pane."
     }
   ]
 }

@@ -32,12 +32,41 @@ class PluginManifestTests(unittest.TestCase):
         self.assertNotIn("skills", manifest)
         self.assertFalse((ROOT / "skills").exists())
 
-    def test_the_marketplace_lists_the_repository_as_its_plugin(self):
-        # Codex reads this marketplace file too.
+    def test_the_marketplace_lists_the_tutor_and_its_companion(self):
+        # Codex reads this marketplace file too; the tutor stays the first entry.
         entries = read_json("marketplace.json")["plugins"]
         self.assertEqual([(entry["name"], entry["source"]) for entry in entries],
-                         [(read_json("plugin.json")["name"], "./")])
+                         [(read_json("plugin.json")["name"], "./"), ("nochmal", "./mods/nochmal")])
         self.assertNotIn("skills", entries[0])
+
+
+class CompanionManifestTests(unittest.TestCase):
+    """The Claude Code companion in mods/nochmal; `claude plugin test mods/nochmal` tests its hooks."""
+
+    FOLDER = ROOT / "mods" / "nochmal"
+
+    def test_the_companion_manifest_names_its_types_and_hooks_module(self):
+        manifest = read_json("plugin.json", "mods/nochmal/.claude-plugin")
+        self.assertEqual(manifest["name"], "nochmal")
+        self.assertTrue((self.FOLDER / manifest["types"]).is_file())
+        hooks = json.loads((self.FOLDER / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+        self.assertEqual(hooks, {"modules": ["./register.tsx"]})
+        self.assertTrue((self.FOLDER / "hooks" / "register.tsx").is_file())
+
+    def test_the_companion_finds_the_engine_of_the_repository_it_sits_in(self):
+        # From mods/nochmal, two folders up is the repository root.
+        module = (self.FOLDER / "hooks" / "register.tsx").read_text(encoding="utf-8")
+        self.assertIn("join($.plugin.root, '..', '..', 'scripts', 'deutsch_loop.py')", module)
+        self.assertTrue((self.FOLDER.parents[1] / "scripts" / "deutsch_loop.py").is_file())
+
+    def test_the_companion_runs_only_read_and_review_commands(self):
+        # It reads state and saves reviews; corrections and scenes stay the tutor's.
+        module = (self.FOLDER / "hooks" / "register.tsx").read_text(encoding="utf-8")
+        commands = set(re.findall(r"cli\(\$, \[(?:current\.kind === 'pattern' \? )?'([a-z-]+)'", module))
+        commands |= set(re.findall(r"engineRun\(\$, \['([a-z-]+)'", module))
+        commands |= {"grade", "vocab-grade"} if "'grade' : 'vocab-grade'" in module else set()
+        self.assertEqual(commands, {"recap", "due", "vocab-due", "list", "show", "scenarios", "roleplay-show",
+                                    "grade", "vocab-grade"})
 
 
 class CodexPluginTests(unittest.TestCase):

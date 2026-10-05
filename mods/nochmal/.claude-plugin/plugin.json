@@ -1,0 +1,14 @@
+{
+  "name": "nochmal",
+  "version": "0.1.0",
+  "description": "DeutschLoop's Claude Code companion: what is due in the status line, a FehlerDNA card while Claude works, a live FehlerDNA pane, and a roleplay scene pane with an honest Hilfe button.",
+  "author": {
+    "name": "Ahmet Sahin",
+    "url": "https://github.com/ahmtsahin"
+  },
+  "homepage": "https://github.com/ahmtsahin/deutsch-loop/blob/main/docs/companion.md",
+  "repository": "https://github.com/ahmtsahin/deutsch-loop",
+  "license": "MIT",
+  "keywords": ["german", "language-learning", "spaced-repetition", "flashcards", "status-line"],
+  "types": "./types/index.d.ts"
+}

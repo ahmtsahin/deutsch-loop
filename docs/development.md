@@ -26,6 +26,17 @@ python evals/interrupted_lesson.py --host claude
 python evals/interrupted_lesson.py --host codex --model gpt-6-astra
 ```
 
+## The Claude Code companion
+
+The companion in `mods/nochmal` is a TypeScript hooks module that Claude Code loads itself, so it has no build step. Its tests run inside Claude Code's plugin test kit, which stands in for the engine, the CLI, and the models:
+
+```bash
+claude plugin validate mods/nochmal
+claude plugin test mods/nochmal
+```
+
+`tests/test_packaging.py` checks its manifest and that it drives only the engine's read commands and `grade`/`vocab-grade`; CI runs that file with the other unit tests. To try a change, start `claude --plugin-dir mods/nochmal` from the repository root; an interactive session reloads the module when a file changes. [Companion guide](companion.md).
+
 ## Render the README stories
 
 The interactive HTML demo uses only the standard library and snapshots isolated learner state:

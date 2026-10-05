@@ -51,6 +51,18 @@ Start a new chat with `$deutsch-loop:deutsch-loop`. To update later, run `codex 
 
 Codex shows the cloned skill under the same name, `deutsch-loop:deutsch-loop`, because the folder contains the plugin manifest. `$deutsch-loop` still starts it.
 
+Codex also lists `nochmal@deutsch-loop`; that is the Claude Code companion below, and Codex has nothing to run it with.
+
+### The Claude Code companion
+
+The marketplace's second plugin adds the status line, the cards while Claude works, and the FehlerDNA and scene panes. It works beside either installation above:
+
+```bash
+claude plugin install nochmal@deutsch-loop
+```
+
+From a cloned folder, load it for one session with `claude --plugin-dir mods/nochmal`. It needs a Claude Code release with mods (plugin function hooks) and stays silent until you have practised with the tutor once. [Companion guide](companion.md).
+
 ### Let it save without asking
 
 The skill keeps your progress in `~/.deutschloop` through a small Python helper. Depending on your host permissions, helper calls may ask for approval or the sandbox may block the state folder. One optional setting removes those interruptions.
