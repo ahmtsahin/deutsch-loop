@@ -26,12 +26,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / "scripts"))
 import demo  # noqa: E402
-import deutsch_dna as dna  # noqa: E402
+import deutsch_loop as dna  # noqa: E402
 from first_session import ClaudeHost, TutorTurn, fingerprint, parse_jsonl  # noqa: E402
 
-SKILL_NAME = "deutsch-dna-demo"
+SKILL_NAME = "deutsch-loop-demo"
 DISCLOSURE = ("Scripted four-month learner history, seeded through the engine; actual, unedited tutor "
-              "replies from one Claude Code chat with an isolated DeutschDNA state directory. "
+              "replies from one Claude Code chat with an isolated DeutschLoop state directory. "
               "The learner's answer was scripted after reading the tutor's task.")
 
 
@@ -63,7 +63,7 @@ def write_transcript(path: Path, recording: dict) -> None:
     lines = ["# A returning learner opens a new chat", "", "[Back to the README](../README.md)", "",
              recording["disclosure"], "",
              f"The chat starts with `/{SKILL_NAME}`, a copy of the skill under another name, so that an "
-             "installed `deutsch-dna` cannot answer in its place.", "",
+             "installed `deutsch-loop` cannot answer in its place.", "",
              f"Host: {recording['host']} · Model: {', '.join(recording['models'])} · "
              f"Captured: {recording['recorded_at']}", "",
              f"[Captured replies and engine evidence]({path.with_suffix('.json').name})", ""]
@@ -116,10 +116,10 @@ def main() -> int:
                             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     (skill / "SKILL.md").write_text(
-        instructions.replace("name: deutsch-dna\n", f"name: {SKILL_NAME}\n", 1), encoding="utf-8")
+        instructions.replace("name: deutsch-loop\n", f"name: {SKILL_NAME}\n", 1), encoding="utf-8")
     settings = work / "settings.json"
     settings.write_text(json.dumps({"permissions": {"allow": [
-        f"{tool}({program} *deutsch_dna.py*)"
+        f"{tool}({program} *deutsch_loop.py*)"
         for tool in ("Bash", "PowerShell") for program in ("python", "python3", "py")
     ]}}), encoding="utf-8")
 
@@ -133,8 +133,8 @@ def main() -> int:
     target = json.loads((work / "callback.json").read_text(encoding="utf-8"))
     card = (work / "card.txt").read_text(encoding="utf-8")
 
-    env = {**os.environ, "DEUTSCHDNA_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
-    real_home = Path.home() / ".deutschdna"
+    env = {**os.environ, "DEUTSCHLOOP_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
+    real_home = dna.standard_home()
     before = fingerprint(real_home)
     host = ClaudeHost(project=project, env=env, model=arguments.model, effort=None, settings=settings, logs=logs)
     messages = [f"/{SKILL_NAME}"] + ([arguments.answer] if arguments.answer else [])

@@ -6,7 +6,7 @@ import json
 from datetime import timedelta
 from unittest import mock
 
-from test_deutsch_dna import BASE_TIME, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, StoreTestCase, dna
 
 
 class OnboardingTests(StoreTestCase):
@@ -43,7 +43,7 @@ class OnboardingTests(StoreTestCase):
                 self.assertEqual(recap["onboarding"]["stage"], "first_practice")
                 self.assertEqual(recap["profile"]["level"], "unspecified")
                 self.assertEqual(self.store.summary(at=BASE_TIME)["categories"], {})
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.init_profile(starting_point="B2", at=BASE_TIME)
 
     def test_explicit_cefr_level_skips_starting_point_question(self):
@@ -132,7 +132,7 @@ class OnboardingTests(StoreTestCase):
         self.assertNotIn("onboarding", record("Ich fahre mit mein Auto.", "Ich fahre mit meinem Auto."))
 
     def test_an_unwritable_state_folder_is_reported_with_a_code(self):
-        # A sandboxed agent, such as Codex in workspace-write mode, may not write to ~/.deutschdna.
+        # A sandboxed agent, such as Codex in workspace-write mode, may not write to ~/.deutschloop.
         errors = io.StringIO()
         with mock.patch.object(dna.os, "open", side_effect=PermissionError(13, "Access is denied")), \
                 contextlib.redirect_stderr(errors):

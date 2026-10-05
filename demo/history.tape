@@ -1,5 +1,5 @@
 # Renders the detailed terminal story with VHS: https://github.com/charmbracelet/vhs
-# Run from the repository root:   vhs demo/deutschdna.tape
+# Run from the repository root:   vhs demo/history.tape
 # Needs python and bash; macOS, Linux, and WSL work out of the box.
 # Every screen is real engine output for a four-month learner story (scripts/demo.py).
 
@@ -18,7 +18,7 @@ Set TypingSpeed 35ms
 Hide
 Type "rm -rf demo-home && python scripts/demo.py --home demo-home --quiet > /dev/null"
 Enter
-Type `dna() { python scripts/deutsch_dna.py --home demo-home "$@"; }`
+Type `dna() { python scripts/deutsch_loop.py --home demo-home "$@"; }`
 Enter
 Type "clear"
 Enter
@@ -30,7 +30,7 @@ Sleep 400ms
 Enter
 Sleep 5s
 
-# 2. Your German DNA, and the root cause behind the symptoms.
+# 2. Your FehlerDNA, and the root cause behind the symptoms.
 Type "clear"
 Enter
 Type "dna summary --format text"
@@ -46,7 +46,7 @@ Sleep 400ms
 Enter
 Sleep 6s
 
-# 4. Three months later the old mistake comes back, and DeutschDNA notices.
+# 4. Three months later the old mistake comes back, and DeutschLoop notices.
 Type "clear"
 Enter
 Type "dna show m_f73a2424acc8 --format text"

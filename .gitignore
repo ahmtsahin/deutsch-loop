@@ -5,6 +5,7 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
+.deutschloop/
 .deutschdna/
 demo-home/
 .claude/

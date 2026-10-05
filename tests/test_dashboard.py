@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from test_agent_contract import CliTestCase
-from test_deutsch_dna import BASE_TIME, CASE_REVIEWS, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, CASE_REVIEWS, StoreTestCase, dna
 from render_dashboard_demo import demo_payload
 
 
@@ -125,7 +125,7 @@ class DashboardTests(CliTestCase):
 
     def test_local_dates_keep_the_engine_offset(self):
         self.record_example()
-        with mock.patch.dict("os.environ", {"DEUTSCHDNA_UTC_OFFSET": "+03:00"}):
+        with mock.patch.dict("os.environ", {"DEUTSCHLOOP_UTC_OFFSET": "+03:00"}):
             view = dna.dashboard_snapshot(self.store, at=BASE_TIME)
         self.assertEqual(view["as_of_local"], "2026-09-10T15:00:00+03:00")
         self.assertEqual(view["patterns"][0]["events"][0]["at_local"], "2026-09-10T15:00:00+03:00")
@@ -175,6 +175,6 @@ class DemoDashboardTests(StoreTestCase):
     def test_the_demo_refuses_to_seed_an_existing_learner_directory(self):
         self.record_example()
         before = self.store.mistakes_path.read_bytes()
-        with self.assertRaisesRegex(dna.DeutschDNAError, "empty, isolated"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "empty, isolated"):
             demo_payload(self.home)
         self.assertEqual(self.store.mistakes_path.read_bytes(), before)

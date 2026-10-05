@@ -1,16 +1,16 @@
-# Practise with DeutschDNA
+# Practise with DeutschLoop
 
 [Back to the README](../README.md)
 
 
-Invoke it with `/deutsch-dna` in Claude Code or `$deutsch-dna` in Codex, or write German and ask for feedback. No profile form or commands to memorize: the skill introduces itself in a few lines and gives you one small German task right away. If you already sent a text or requested a scene, it helps with that immediately.
+Invoke it with `/deutsch-loop` in Claude Code or `$deutsch-loop` in Codex, or write German and ask for feedback. No profile form or commands to memorize: the skill introduces itself in a few lines and gives you one small German task right away. If you already sent a text or requested a scene, it helps with that immediately.
 
 ### Your first minute
 
-The welcome is brief. It uses your language when it knows it; after a bare `/deutsch-dna`, it starts in English and switches to the language you answer in:
+The welcome is brief. It uses your language when it knows it; after a bare `/deutsch-loop`, it starts in English and switches to the language you answer in:
 
 ```text
-Hi! I'm DeutschDNA, your German practice partner. I correct what you write,
+Hi! I'm DeutschLoop, your German practice partner. I correct what you write,
 practise everyday situations with you, and remember the mistakes you repeat
 and the hints that helped.
 
@@ -31,12 +31,12 @@ There is no level test first. If your sentence has a mistake, you get a small hi
 - **Continue my interview preparation.** Resume its scene or next step, with the original goal and date preserved.
 - **Roleplay Restaurant.** Fifteen frames with optional complications. No ordinary correction interruptions; at most three corrections in the debrief.
 - **Let's practise words.** Words from your scenes come back after 1, 3, 7, 14, 30, and 60 days, each time in a new sentence you write yourself.
-- **How am I doing?** The DeutschDNA profile, the root cause behind your weakest area, and a family drill for it.
+- **How am I doing?** The FehlerDNA profile, the root cause behind your weakest area, and a family drill for it.
 - **That wasn't a mistake.** The agent reverts just that correction with `undo`, schedule included, or fixes the entry with `merge`, `rename`, or `forget`. A wrong merge can be undone too.
 
 ## Keep talking. Corrections come after.
 
-Start with “Restoranda konuşalım” or `speak restaurant`. With the installed skill, you can use `/deutsch-dna speak restaurant` in Claude Code or `$deutsch-dna speak restaurant` in Codex.
+Start with “Restoranda konuşalım” or `speak restaurant`. With the installed skill, you can use `/deutsch-loop speak restaurant` in Claude Code or `$deutsch-loop speak restaurant` in Codex.
 
 ```text
 Kellner: Guten Abend. Haben Sie reserviert?
@@ -79,10 +79,10 @@ The opening and partner role are prepared; the conversation continues from your 
 The CLI catalog includes an opening and two variations per frame:
 
 ```bash
-python scripts/deutsch_dna.py scenarios
-python scripts/deutsch_dna.py speak interview
-python scripts/deutsch_dna.py speak train
-python scripts/deutsch_dna.py speak phone
+python scripts/deutsch_loop.py scenarios
+python scripts/deutsch_loop.py speak interview
+python scripts/deutsch_loop.py speak train
+python scripts/deutsch_loop.py speak phone
 ```
 
 For an actual upcoming event, ask for [continuing preparation](missions.md) so that the next scene uses the previous one's evidence instead of starting a separate roleplay.

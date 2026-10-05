@@ -12,7 +12,7 @@ and one more sentence with the same structure. The checks read the saved state:
 - no answer given after a hint was saved as unaided, and no transfer was claimed on the same day.
 
 This makes real model calls on your accounts and takes a few minutes per run. It never uses
-~/.deutschdna: the host gets its own state directory, and the run fails if the real one changes.
+~/.deutschloop: the host gets its own state directory, and the run fails if the real one changes.
 
     python evals/interrupted_lesson.py --host claude
     python evals/interrupted_lesson.py --host codex --model gpt-6-astra
@@ -36,7 +36,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from first_session import (  # noqa: E402
     CLAUDE_ALLOW_RULES, INTERNAL_TERMS, ROOT, SKILL_NAME, Check, ClaudeHost, CodexHost, Exchange, Run,
-    fingerprint, install_skill, normalized, write_transcript,
+    dna, fingerprint, install_skill, normalized, write_transcript,
 )
 
 # None stands for the host's own opening prompt.
@@ -81,7 +81,7 @@ def evaluate(run: Run, after_hint: list[dict[str, Any]] | None, mistakes: list[d
     blocked = [call for call in calls if call.denied]
     failed = [call for call in cli if call.ok is False and not call.denied]
     checks = [
-        Check("real state untouched", real_before == real_after, "~/.deutschdna unchanged" if real_before == real_after else "~/.deutschdna CHANGED during the run"),
+        Check("real state untouched", real_before == real_after, "~/.deutschloop unchanged" if real_before == real_after else "~/.deutschloop CHANGED during the run"),
         Check("no blocked calls", not blocked, f"{len(blocked)} blocked: " + "; ".join(call.text[:120] for call in blocked[:3]) if blocked else "none"),
         Check("no failed helper calls", not failed, "; ".join(f"{call.text[:100]} → {call.output[:160]}" for call in failed[:3]) or "none", hard=False),
     ]
@@ -124,16 +124,16 @@ def evaluate(run: Run, after_hint: list[dict[str, Any]] | None, mistakes: list[d
 def one_run(arguments: argparse.Namespace, host_name: str, number: int, out: Path) -> bool:
     token = uuid.uuid4().hex[:8]
     # Not mkdtemp: on Windows it limits the folder to the current user, and the Codex sandbox could not read it.
-    work = Path(tempfile.gettempdir()) / f"deutschdna-interrupted-{host_name}-{token}"
+    work = Path(tempfile.gettempdir()) / f"deutschloop-interrupted-{host_name}-{token}"
     project, logs = work / "project", out / f"{host_name}-{number}"
     for directory in (project, logs):
         directory.mkdir(parents=True, exist_ok=True)
-    state = Path.home() / f".deutschdna-smoke-{token}"
+    state = Path.home() / f".deutschloop-smoke-{token}"
     skill_dir = project / (".claude" if host_name == "claude" else ".agents") / "skills" / SKILL_NAME
-    real_home = Path.home() / ".deutschdna"
+    real_home = dna.standard_home()
     real_before = fingerprint(real_home)
-    env = {**os.environ, "DEUTSCHDNA_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
-    env.pop("DEUTSCHDNA_UTC_OFFSET", None)
+    env = {**os.environ, "DEUTSCHLOOP_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
+    env.pop("DEUTSCHLOOP_UTC_OFFSET", None)
     settings = work / "settings.json"
     settings.write_text(json.dumps({"permissions": {"allow": CLAUDE_ALLOW_RULES}}), encoding="utf-8")
     run = Run(host=host_name, setup="done")
@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, help="where transcripts and reports go (default: a temporary folder)")
     parser.add_argument("--keep", action="store_true", help="keep the project and state folders for inspection")
     arguments = parser.parse_args(argv)
-    out = arguments.out or Path(tempfile.gettempdir()) / "deutschdna-interrupted" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    out = arguments.out or Path(tempfile.gettempdir()) / "deutschloop-interrupted" / datetime.now().strftime("%Y%m%d-%H%M%S")
     out.mkdir(parents=True, exist_ok=True)
     hosts = ["claude", "codex"] if arguments.host == "both" else [arguments.host]
     results = [(host_name, one_run(arguments, host_name, number, out))

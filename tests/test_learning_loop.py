@@ -7,7 +7,7 @@ import os
 from datetime import timedelta
 from unittest import mock
 
-from test_deutsch_dna import BASE_TIME, CASE_REVIEWS, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, CASE_REVIEWS, StoreTestCase, dna
 
 
 class LearningLoopTests(StoreTestCase):
@@ -21,7 +21,7 @@ class LearningLoopTests(StoreTestCase):
     def test_six_early_passes_cannot_create_mastery(self):
         first, _, _ = self.record_example()
         for index, (prompt, answer) in enumerate(CASE_REVIEWS, 1):
-            with self.subTest(minutes=index * 6), self.assertRaisesRegex(dna.DeutschDNAError, "not due"):
+            with self.subTest(minutes=index * 6), self.assertRaisesRegex(dna.DeutschLoopError, "not due"):
                 self.store.grade(first["id"], result="pass", prompt=prompt, answer=answer,
                                  at=BASE_TIME + timedelta(minutes=index * 6))
         self.assertEqual(self.store.show(first["id"]), first)
@@ -32,7 +32,7 @@ class LearningLoopTests(StoreTestCase):
         passed, _ = self.grade_example(first["id"], result="pass", at=due)
         repeated, status = self.grade_example(first["id"], result="pass", at=due + timedelta(minutes=1))
         self.assertEqual((status, repeated["review_attempts"]), ("duplicate", 1))
-        with self.assertRaisesRegex(dna.DeutschDNAError, "not due"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "not due"):
             self.grade_example(first["id"], result="pass", answer=CASE_REVIEWS[1][1], at=due + timedelta(minutes=2))
         self.assertEqual(self.store.show(first["id"]), passed)
 
@@ -50,7 +50,7 @@ class LearningLoopTests(StoreTestCase):
             {"prompt": CASE_REVIEWS[1][0], "answer": first["examples"][0]["corrected"]},
         ]
         for args in attempts:
-            with self.subTest(args=args), self.assertRaises(dna.DeutschDNAError):
+            with self.subTest(args=args), self.assertRaises(dna.DeutschLoopError):
                 self.store.grade(first["id"], result="pass", at=at, **args)
         self.assertEqual(self.store.show(first["id"]), before)
 
@@ -62,7 +62,7 @@ class LearningLoopTests(StoreTestCase):
                                        answer=f"Testantwort {index}", at=dna.parse_moment(item["next_review"]))
         self.assertFalse(any(event.get("prompt") == CASE_REVIEWS[0][0] for event in item["review_history"]))
         for prompt, answer in ((CASE_REVIEWS[0][0], CASE_REVIEWS[1][1]), (CASE_REVIEWS[1][0], CASE_REVIEWS[0][1])):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.store.grade(first["id"], result="pass", prompt=prompt, answer=answer, at=dna.parse_moment(item["next_review"]))
         self.assertNotIn("seen_answers", dna.public(item))
 
@@ -124,16 +124,16 @@ class LearningLoopTests(StoreTestCase):
         for outcome in ("shown", "miss"):
             self.assisted(first["id"], outcome=outcome)
             self.assertIsNone(self.store.show(first["id"])["helpful_hint"])
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.assisted(first["id"], outcome="independent")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.assisted(first["id"], hint=None)
         next_day = self.store.observe([first["id"]], context=CASE_REVIEWS[0][1], at=BASE_TIME + timedelta(days=1))[0]
         self.assertIsNone(next_day["learning_proof"])
 
     def test_a_copied_correction_is_not_independent_practice(self):
         first, _, _ = self.record_example()
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.coach(first["id"], outcome="independent", prompt="Noch einmal bitte.",
                              answer=first["examples"][0]["corrected"], at=BASE_TIME + timedelta(minutes=5))
         self.assertEqual(self.store.show(first["id"]), first)
@@ -143,7 +143,7 @@ class LearningLoopTests(StoreTestCase):
         first, _, _ = self.record_example()
         self.assisted(first["id"])
         later = BASE_TIME + timedelta(days=1)
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.coach(first["id"], outcome="independent", prompt="Weiter mit der Aufgabe von gestern.",
                              answer="Ich spreche mit meinem Chef.", at=later)
         result = self.store.observe([first["id"]], context="Ich spreche mit meinem Chef.", at=later)[0]
@@ -191,7 +191,7 @@ class LearningLoopTests(StoreTestCase):
 
     def test_transfer_requires_a_later_local_day(self):
         first, _, _ = self.record_example()
-        with mock.patch.dict(os.environ, {"DEUTSCHDNA_UTC_OFFSET": "+02:00"}):
+        with mock.patch.dict(os.environ, {"DEUTSCHLOOP_UTC_OFFSET": "+02:00"}):
             self.assisted(first["id"], at=BASE_TIME + timedelta(hours=11))
             result = self.store.observe([first["id"]], context=CASE_REVIEWS[0][1], at=BASE_TIME + timedelta(hours=12, minutes=1))[0]
             self.assertIsNone(result["learning_proof"], "Crossing UTC midnight is not a new local day")

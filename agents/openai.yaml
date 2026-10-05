@@ -1,5 +1,5 @@
 interface:
-  display_name: "DeutschDNA"
+  display_name: "DeutschLoop"
   short_description: "Simple German practice that remembers what helps"
   brand_color: "#D9FF45"
-  default_prompt: "Use $deutsch-dna to help me start practising German, with a short explanation and one easy first step."
+  default_prompt: "Use $deutsch-loop to help me start practising German, with a short explanation and one easy first step."

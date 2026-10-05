@@ -14,9 +14,9 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts" / "deutsch_dna.py"
+SCRIPT = ROOT / "scripts" / "deutsch_loop.py"
 sys.path.insert(0, str(SCRIPT.parent))
-import deutsch_dna as dna  # noqa: E402
+import deutsch_loop as dna  # noqa: E402
 
 
 BASE_TIME = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
@@ -32,9 +32,9 @@ CASE_REVIEWS = [
 
 class StoreTestCase(unittest.TestCase):
     def setUp(self):
-        self._environment = mock.patch.dict(os.environ, {"DEUTSCHDNA_UTC_OFFSET": "+00:00"})
+        self._environment = mock.patch.dict(os.environ, {"DEUTSCHLOOP_UTC_OFFSET": "+00:00"})
         self._environment.start()
-        self._temporary = tempfile.TemporaryDirectory(prefix="deutschdna-test-")
+        self._temporary = tempfile.TemporaryDirectory(prefix="deutschloop-test-")
         self.home = Path(self._temporary.name)
         self.store = dna.StateStore(self.home)
 
@@ -148,11 +148,11 @@ class ProfileAndRecordingTests(StoreTestCase):
         self.assertEqual(status, "updated")
         self.assertEqual(mistake["occurrences"], 2)
         self.assertEqual(extra["resolved_by"], "mistake_id")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.record(original="x", corrected="y", mistake_id="m_missing")
 
     def test_missing_pattern_fields_are_rejected(self):
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.record(original="Ich bin.", corrected="Ich bin.", category="case")
 
     def test_new_pattern_reports_similar_existing_patterns(self):
@@ -235,7 +235,7 @@ class ReviewTests(StoreTestCase):
 
     def test_fail_without_answer_is_rejected_without_inventing_an_example(self):
         mistake, _, _ = self.record_example()
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.grade(mistake["id"], result="fail", prompt=CASE_REVIEWS[0][0], at=BASE_TIME + timedelta(days=1))
         self.assertEqual(self.store.show(mistake["id"]), mistake)
 
@@ -302,7 +302,7 @@ class RepairTests(StoreTestCase):
         removed = self.store.forget(second["id"])
         self.assertEqual(removed["id"], second["id"])
         self.assertEqual(len(self.store.list(status="all")), 1)
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.show(second["id"])
 
     def test_forget_removes_pattern_from_sessions(self):
@@ -339,7 +339,7 @@ class RepairTests(StoreTestCase):
         self.assertEqual(resolved["id"], target["id"])
         self.assertEqual(status, "updated")
         self.assertEqual(extra["resolved_by"], "alias")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.merge(target["id"], target["id"])
 
     def test_rename_changes_id_keeps_alias_and_refuses_clashes(self):
@@ -361,9 +361,9 @@ class RepairTests(StoreTestCase):
         resolved, status, _ = self.record_example(at=BASE_TIME + timedelta(days=1))
         self.assertEqual(resolved["id"], renamed["id"])
         self.assertEqual(status, "updated")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.rename(renamed["id"], pattern="helfen + Dativ")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.rename(other["id"])
 
 
@@ -471,9 +471,9 @@ class CorrectionTests(unittest.TestCase):
 
 class CliTests(unittest.TestCase):
     def setUp(self):
-        self._environment = mock.patch.dict(os.environ, {"DEUTSCHDNA_UTC_OFFSET": "+00:00"})
+        self._environment = mock.patch.dict(os.environ, {"DEUTSCHLOOP_UTC_OFFSET": "+00:00"})
         self._environment.start()
-        self._temporary = tempfile.TemporaryDirectory(prefix="deutschdna-cli-")
+        self._temporary = tempfile.TemporaryDirectory(prefix="deutschloop-cli-")
         self.home = self._temporary.name
 
     def tearDown(self):
@@ -541,7 +541,7 @@ class CliTests(unittest.TestCase):
         mistake_id = recorded["mistake"]["id"]
         self.assertEqual(recorded["recent"]["occurrences"], 1)
         summary = self.run_cli("summary", "--format", "text", "--at", "2026-09-02T09:00:00Z")
-        self.assertIn("DeutschDNA · Alex · B2", summary)
+        self.assertIn("FehlerDNA · Alex · B2", summary)
         self.assertIn("Kasus", summary)
         self.assertIn("neu", summary)
         self.assertNotIn("%", summary)
@@ -719,7 +719,7 @@ class TimelineAndMigrationTests(StoreTestCase):
         sys.path.insert(0, str(SCRIPT.parent))
         import demo  # noqa: E402
 
-        with tempfile.TemporaryDirectory(prefix="deutschdna-demo-test-") as directory:
+        with tempfile.TemporaryDirectory(prefix="deutschloop-demo-test-") as directory:
             home = Path(directory)
             demo.seed(home)
             store = dna.StateStore(home)
@@ -746,7 +746,7 @@ class UndoTests(StoreTestCase):
         self.assertEqual(after, {key: value for key, value in before.items() if key != "undo"})
         self.assertEqual(after["occurrences"], 1)
         self.assertNotIn("undo", after)
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.undo(first["id"])
 
     def test_undo_of_a_new_pattern_removes_it(self):
@@ -778,7 +778,7 @@ class UndoTests(StoreTestCase):
     def test_rename_and_merge_clear_the_undo_snapshot(self):
         mistake, _, _ = self.record_example()
         renamed = self.store.rename(mistake["id"], rule="mit governs the dative")["mistake"]
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.undo(renamed["id"])
 
     def test_cli_hides_the_snapshot_but_reports_that_undo_is_available(self):
@@ -852,9 +852,38 @@ class CallbackDataTests(StoreTestCase):
         self.assertNotIn("%", text)
 
 
+class RenamedSettingsTests(unittest.TestCase):
+    """Learners who started under the old name, DeutschDNA, keep their folder and settings."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="deutschloop-home-")
+        self.addCleanup(temporary.cleanup)
+        self.user_home = Path(temporary.name)
+        for patcher in (mock.patch.object(Path, "home", return_value=self.user_home), mock.patch.dict(os.environ)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        for name in ("DEUTSCHLOOP_HOME", "DEUTSCHDNA_HOME", "DEUTSCHLOOP_UTC_OFFSET", "DEUTSCHDNA_UTC_OFFSET"):
+            os.environ.pop(name, None)
+
+    def test_an_old_folder_stays_in_use_until_a_new_one_exists(self):
+        self.assertEqual(dna.default_home(), self.user_home / ".deutschloop")
+        (self.user_home / ".deutschdna").mkdir()
+        self.assertEqual(dna.default_home(), self.user_home / ".deutschdna")
+        (self.user_home / ".deutschloop").mkdir()
+        self.assertEqual(dna.default_home(), self.user_home / ".deutschloop")
+
+    def test_old_environment_settings_still_apply(self):
+        os.environ.update({"DEUTSCHDNA_HOME": "/old/state", "DEUTSCHDNA_UTC_OFFSET": "+03:00"})
+        self.assertEqual(dna.default_home(), Path("/old/state"))
+        self.assertEqual(dna.local_zone(), timezone(timedelta(hours=3)))
+        os.environ.update({"DEUTSCHLOOP_HOME": "/new/state", "DEUTSCHLOOP_UTC_OFFSET": "-01:00"})
+        self.assertEqual(dna.default_home(), Path("/new/state"))
+        self.assertEqual(dna.local_zone(), timezone(timedelta(hours=-1)))
+
+
 class LocalTimeAndCardTests(StoreTestCase):
     def use_offset(self, offset: str) -> None:
-        patcher = mock.patch.dict(os.environ, {"DEUTSCHDNA_UTC_OFFSET": offset})
+        patcher = mock.patch.dict(os.environ, {"DEUTSCHLOOP_UTC_OFFSET": offset})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -876,8 +905,8 @@ class LocalTimeAndCardTests(StoreTestCase):
             original="Ich fahre mit mein Auto.", corrected="Ich fahre mit meinem Auto.", at=BASE_TIME + timedelta(days=1)
         )
         self.assertEqual(extra["previous"]["first_example"]["seen_at_local"], "2026-09-10T14:00:00+02:00")
-        with self.assertRaises(dna.DeutschDNAError):
-            with mock.patch.dict(os.environ, {"DEUTSCHDNA_UTC_OFFSET": "two hours"}):
+        with self.assertRaises(dna.DeutschLoopError):
+            with mock.patch.dict(os.environ, {"DEUTSCHLOOP_UTC_OFFSET": "two hours"}):
                 dna.local_zone()
 
     def test_streak_counts_local_days(self):
@@ -909,7 +938,7 @@ class LocalTimeAndCardTests(StoreTestCase):
         )
         recap = self.store.recap(at=datetime(2026, 9, 11, 8, 0, tzinfo=timezone.utc))
         lines = recap["card"].splitlines()
-        self.assertEqual(lines[0], "DeutschDNA · Alex · B2 · 1 Tag in Folge · 0 von 2 gemeistert")
+        self.assertEqual(lines[0], "FehlerDNA · Alex · B2 · 1 Tag in Folge · 0 von 2 gemeistert")
         self.assertEqual(lines[1], "")
         self.assertTrue(lines[2].startswith("mit + Dativ "))
         self.assertIn("▱▱▱▱▱▱ 0/6", lines[2])
@@ -954,7 +983,7 @@ class LocalTimeAndCardTests(StoreTestCase):
         recap = self.store.recap(at=BASE_TIME)
         self.assertEqual(
             recap["card"],
-            "DeutschDNA\nNoch keine Einträge. Schreib ein paar Sätze auf Deutsch, dann entsteht deine DNA.",
+            "FehlerDNA\nNoch keine Einträge. Schreib ein paar Sätze auf Deutsch, dann entsteht deine FehlerDNA.",
         )
         self.assertFalse(recap["full_profile_due"])
 
@@ -1010,9 +1039,9 @@ class LabelTests(StoreTestCase):
             code = dna.main(["--home", str(self.home), "rename", mistake["id"], "--label", "hätte gern (höflich)"])
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(buffer.getvalue())["mistake"]["label"], "hätte gern (höflich)")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.rename(mistake["id"], label="   ")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.record_example(label="x" * 61, original="Neu eins.", corrected="Neu zwei.")
 
     def test_text_views_use_german_labels(self):

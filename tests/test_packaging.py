@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CODEX_ENTRY = ROOT / ".codex-plugin" / "skills" / "deutsch-dna" / "SKILL.md"
+CODEX_ENTRY = ROOT / ".codex-plugin" / "skills" / "deutsch-loop" / "SKILL.md"
 
 
 def read_json(name: str, folder: str = ".claude-plugin") -> dict:

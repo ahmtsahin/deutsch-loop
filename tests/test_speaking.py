@@ -6,7 +6,7 @@ import json
 from datetime import timedelta
 from unittest import mock
 
-from test_deutsch_dna import BASE_TIME, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, StoreTestCase, dna
 
 
 class SpeakingTests(StoreTestCase):
@@ -32,7 +32,7 @@ class SpeakingTests(StoreTestCase):
         self.turn(identifier, "Guten Abend. Haben Sie reserviert?", seconds=0, speaker="partner")
         wrong = self.turn(identifier)
         self.assertEqual(self.store.list(), [])
-        with self.assertRaisesRegex(dna.DeutschDNAError, "Stop the scene"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "Stop the scene"):
             self.plural(identifier, wrong)
         self.assertIsNone(self.store.roleplay_show(identifier, at=BASE_TIME + timedelta(seconds=299))["debrief"])
         self.assertFalse(self.store.roleplay_show(identifier, at=BASE_TIME + timedelta(seconds=299))["should_close"])
@@ -63,9 +63,9 @@ class SpeakingTests(StoreTestCase):
         identifier = self.scene()
         self.turn(identifier)
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(minutes=5))
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_finish(identifier, turns=8)
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_finish(identifier, duration_seconds=402)
         self.assertEqual(self.store.roleplay_show(identifier)["session"]["status"], "debriefing")
 
@@ -74,22 +74,22 @@ class SpeakingTests(StoreTestCase):
         first = self.turn(identifier, event_id="msg-1")
         duplicate = self.store.roleplay_turn(identifier, speaker="learner", text=first["text"], event_id="msg-1", at=BASE_TIME + timedelta(seconds=31))
         self.assertEqual(duplicate["status"], "duplicate")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.turn(identifier, "Andere Antwort.", seconds=32, event_id="msg-1")
         self.turn(identifier, seconds=33, event_id="msg-2")
         self.assertEqual(self.store.roleplay_show(identifier)["learner_turns"], 2)
 
     def test_turns_and_stop_reject_impossible_timestamps_and_closed_scenes(self):
         identifier = self.scene()
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.turn(identifier, seconds=-1)
         self.turn(identifier, seconds=60)
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(seconds=59))
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_finish(identifier, at=BASE_TIME + timedelta(seconds=59))
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(seconds=61))
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.turn(identifier, seconds=62)
 
     def test_feedback_must_reference_the_actual_learner_sentence(self):
@@ -98,7 +98,7 @@ class SpeakingTests(StoreTestCase):
         learner = self.turn(identifier, seconds=40)
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(minutes=5))
         for turn, original in ((partner, partner["text"]), (learner, "Invented sentence.")):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.plural(identifier, turn, original=original)
         wrong, _, _ = self.plural(identifier, learner)
         self.assertEqual(wrong["last_seen"], learner["at"])
@@ -144,8 +144,8 @@ class SpeakingTests(StoreTestCase):
         identifier = self.scene()
         turn = self.turn(identifier)
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(minutes=5))
-        with mock.patch.object(self.store, "_session_feedback", side_effect=dna.DeutschDNAError("interrupted")):
-            with self.assertRaises(dna.DeutschDNAError):
+        with mock.patch.object(self.store, "_session_feedback", side_effect=dna.DeutschLoopError("interrupted")):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.plural(identifier, turn)
         pattern, status, _ = self.plural(identifier, turn)
         self.assertEqual(status, "duplicate")
@@ -161,7 +161,7 @@ class SpeakingTests(StoreTestCase):
         again = self.store.roleplay_vocab(identifier, term="reservieren", surface="reserviert", meaning="rezervasyon yapmak", turn_id=turn["id"])
         self.assertEqual(again["status"], "duplicate")
         for surface in ("Hotel", "serviert"):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.store.roleplay_vocab(identifier, term="Hotel", surface=surface, meaning="otel", turn_id=turn["id"])
         self.assertEqual(len(self.finish(identifier)["vocabulary"]), 1)
 
@@ -266,7 +266,7 @@ class SpeakingTests(StoreTestCase):
         turn = self.turn(identifier, "ich habe eine reservierung")
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(minutes=5))
         for category in ("spelling", "punctuation"):
-            with self.assertRaisesRegex(dna.DeutschDNAError, "speech transcript"):
+            with self.assertRaisesRegex(dna.DeutschLoopError, "speech transcript"):
                 self.plural(identifier, turn, category=category, pattern="German nouns are capitalized", corrected="Ich habe eine Reservierung.")
         self.assertEqual(self.store.list(), [])
 
@@ -302,7 +302,7 @@ class SpeakingTests(StoreTestCase):
         self.assertEqual(self.store.roleplay_show(identifier)["session"]["utterances"][0]["text"], turn["text"])
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(minutes=5))
         self.assertEqual(self.store.recap(at=BASE_TIME + timedelta(minutes=6))["active_roleplay"]["status"], "debriefing")
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_finish(identifier, at=BASE_TIME + timedelta(minutes=4))
         self.finish(identifier)
         self.assertIsNone(self.store.recap(at=BASE_TIME + timedelta(minutes=11))["active_roleplay"])
@@ -313,12 +313,12 @@ class SpeakingTests(StoreTestCase):
         self.store.roleplay_stop(identifier, at=BASE_TIME + timedelta(minutes=5))
         for term in ("Brot", "Wasser", "Suppe", "Kaffee", "Tee"):
             self.store.roleplay_vocab(identifier, term=term, meaning="test meaning", turn_id=turn["id"])
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_vocab(identifier, term="Milch", meaning="süt", turn_id=turn["id"])
         self.finish(identifier)
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.roleplay_vocab(identifier, term="Milch", meaning="süt", turn_id=turn["id"])
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.plural(identifier, turn)
 
     def test_speaking_demo_counts_real_scripted_occurrences_and_elapsed_time(self):

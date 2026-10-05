@@ -9,14 +9,14 @@ JSON views are sized for an agent's context. List rows (`list`, `recap.board`, `
 The state directory is selected in this order:
 
 1. global `--home PATH` argument;
-2. `DEUTSCHDNA_HOME` environment variable;
-3. `~/.deutschdna`.
+2. `DEUTSCHLOOP_HOME` environment variable, or `DEUTSCHDNA_HOME` from before the project was renamed;
+3. `~/.deutschloop`, or `~/.deutschdna` when only that older folder exists.
 
 The CLI creates `profile.json`, `mistakes.json`, `sessions.json`, and `vocabulary.json` atomically. Each command holds an exclusive lock on the directory (`.lock`) from its first read to its last write, so parallel calls, such as one `record` per pattern of one sentence, wait for each other instead of overwriting each other's changes. A command waits up to 20 seconds for the lock; the operating system releases it if a process dies. They are plain JSON for portability, but integrations must change them only through the CLI, never by hand. Mistake state from schema versions 1 and 2 is upgraded to version 3 on read and persisted on the next write; pattern IDs are kept. Migration cannot recover already-evicted examples.
 
 Each pattern pins its `first_example`, latest successful `helpful_hint`, and latest `learning_proof` independently of the rolling histories (12 wrong examples and 30 events per history). `seen_prompts` and `seen_answers` retain normalized text fingerprints beyond those windows to reject repeated exercises; they are omitted from public output. Exact-text novelty checks ignore casing, punctuation, and whitespace but cannot prove semantic novelty or grade German. The teaching agent must still judge the target structure and whether a task requires a genuinely different production.
 
-Stored times are UTC. Outputs add `*_local` twins such as `seen_at_local`, `next_review_local`, and `last_activity_local` in the machine's time zone, or in `DEUTSCHDNA_UTC_OFFSET` (for example `+02:00`) when it is set. Day-based values follow the local calendar: streaks, today, yesterday, and days since the last activity. Rendering `summary --format text` records `last_full_profile_at` in the profile.
+Stored times are UTC. Outputs add `*_local` twins such as `seen_at_local`, `next_review_local`, and `last_activity_local` in the machine's time zone, or in `DEUTSCHLOOP_UTC_OFFSET` (for example `+02:00`) when it is set. Day-based values follow the local calendar: streaks, today, yesterday, and days since the last activity. Rendering `summary --format text` records `last_full_profile_at` in the profile.
 
 ## Commands
 
@@ -42,7 +42,7 @@ Stored times are UTC. Outputs add `*_local` twins such as `seen_at_local`, `next
 | `mission-assess` | Assess a completed linked scene as `achieved` or `practice`, with required actual `--support`, source `--evidence-turn-id` flags, and `--note`. |
 | `mission-undo` | Undo the latest goal assessment, leaving grammar records intact; blocked while a newer scene is unassessed. |
 | `mission-update` | Change `--goal`/`--deadline` or `--cancel` an active plan. End and finish an active/debriefing scene before cancelling. |
-| `dashboard` | Export a self-contained offline HTML snapshot to `--output` (default `deutschdna-dashboard.html`). `--force` deliberately replaces an existing HTML export. Returns the absolute path, pattern count, frame count, and demo flag. Leaves learner JSON, profile-display markers, and schedules unchanged. |
+| `dashboard` | Export a self-contained offline HTML snapshot to `--output` (default `deutschloop-dashboard.html`). `--force` deliberately replaces an existing HTML export. Returns the absolute path, pattern count, frame count, and demo flag. Leaves learner JSON, profile-display markers, and schedules unchanged. |
 | `recap` | The session opener: resumable `onboarding`, activity in the last `--days` (default 7), totals, `schedule`, `full_profile_due`, `board` with `board_more`, the rendered `card`, the `callback` pattern (the first due one, else the most recent mistake, with `reason`), and `needs_label` (active patterns still shown by their English key). |
 | `speak`, `roleplay-start` | Start an uninterrupted scene with a target duration, input mode, relevant goal, and optional focus. `speak restaurant` defaults to five minutes. |
 | `roleplay-turn` | Store one actual learner/partner utterance; returns the turn ID, elapsed time, learner-turn count, and `should_close` cue without grading. |
@@ -54,7 +54,7 @@ Stored times are UTC. Outputs add `*_local` twins such as `seen_at_local`, `next
 | `vocab-undo`, `vocab-forget` | Revert a word's latest grade or scene addition; remove a wrong word from the deck and its scene reports. |
 | `roleplay-finish`, `roleplay-show` | Complete/inspect a scene; a finished scene exposes a grounded debrief, also available with `--format text`. |
 
-Commands that record timestamps accept `--at ISO-8601` for deterministic integrations and tests. Use `python scripts/deutsch_dna.py COMMAND --help` for exact arguments.
+Commands that record timestamps accept `--at ISO-8601` for deterministic integrations and tests. Use `python scripts/deutsch_loop.py COMMAND --help` for exact arguments.
 
 ## Speaking scenes and debriefs
 

@@ -1,14 +1,14 @@
 {
-  "name": "deutsch-dna",
-  "displayName": "DeutschDNA",
-  "version": "1.8.0",
+  "name": "deutsch-loop",
+  "displayName": "DeutschLoop",
+  "version": "2.0.0",
   "description": "A German tutor that remembers your mistakes, brings each one back in a new sentence, and keeps the hint that helped. Local memory, no API key.",
   "author": {
     "name": "Ahmet Sahin",
     "url": "https://github.com/ahmtsahin"
   },
-  "homepage": "https://github.com/ahmtsahin/deutsch-dna",
-  "repository": "https://github.com/ahmtsahin/deutsch-dna",
+  "homepage": "https://github.com/ahmtsahin/deutsch-loop",
+  "repository": "https://github.com/ahmtsahin/deutsch-loop",
   "license": "MIT",
   "keywords": ["german", "language-learning", "spaced-repetition", "tutor", "deutsch"]
 }

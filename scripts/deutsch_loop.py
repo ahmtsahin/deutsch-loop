@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DeutschDNA's dependency-free local mistake memory, word deck, and review engine.
+"""DeutschLoop's dependency-free local mistake memory, word deck, and review engine.
 
 All learner state is plain JSON under one directory, and nothing leaves the machine.
 """
@@ -120,7 +120,7 @@ PATTERN_ALIASES = {
 DROPPED_PATTERN_TOKENS = frozenset({"case", "kasus", "the"})
 
 
-class DeutschDNAError(Exception):
+class DeutschLoopError(Exception):
     """A user-facing CLI error; `code` names the errors an agent handles in its own way."""
 
     def __init__(self, message: str, *, code: str | None = None):
@@ -131,8 +131,8 @@ class DeutschDNAError(Exception):
 STATE_NOT_WRITABLE = "state_not_writable"
 
 
-def _state_not_writable(home: Path, exc: OSError) -> DeutschDNAError:
-    return DeutschDNAError(
+def _state_not_writable(home: Path, exc: OSError) -> DeutschLoopError:
+    return DeutschLoopError(
         f"Cannot write the learner's progress in {home}: {exc}. An agent sandbox may be blocking this folder; "
         "run the command again with the learner's approval, or allow the folder once as the README describes.",
         code=STATE_NOT_WRITABLE,
@@ -152,7 +152,7 @@ def parse_moment(value: str | None) -> datetime:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
-        raise DeutschDNAError(f"Invalid ISO-8601 time: {value}") from exc
+        raise DeutschLoopError(f"Invalid ISO-8601 time: {value}") from exc
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc).replace(microsecond=0)
@@ -162,14 +162,19 @@ def iso(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _setting(name: str) -> str:
+    """DEUTSCHLOOP_<name>, or DEUTSCHDNA_<name> as it was set before the project was renamed."""
+    return os.environ.get(f"DEUTSCHLOOP_{name}") or os.environ.get(f"DEUTSCHDNA_{name}") or ""
+
+
 def local_zone() -> timezone | None:
-    """The learner's time zone: DEUTSCHDNA_UTC_OFFSET such as +02:00, or the system zone by default."""
-    configured = os.environ.get("DEUTSCHDNA_UTC_OFFSET", "").strip()
+    """The learner's time zone: DEUTSCHLOOP_UTC_OFFSET such as +02:00, or the system zone by default."""
+    configured = _setting("UTC_OFFSET").strip()
     if not configured:
         return None
     match = re.fullmatch(r"([+-])(\d{1,2}):?(\d{2})", configured)
     if not match:
-        raise DeutschDNAError(f"Invalid DEUTSCHDNA_UTC_OFFSET '{configured}'; use a form like +02:00")
+        raise DeutschLoopError(f"Invalid DEUTSCHLOOP_UTC_OFFSET '{configured}'; use a form like +02:00")
     offset = timedelta(hours=int(match.group(2)), minutes=int(match.group(3)))
     return timezone(offset if match.group(1) == "+" else -offset)
 
@@ -212,7 +217,7 @@ def parse_deadline(value: str | None, moment: datetime) -> str | None:
             return date.fromisoformat(text).isoformat()
         except ValueError:
             pass
-    raise DeutschDNAError("Deadline must be YYYY-MM-DD, today/tomorrow, or a weekday in English, German, or Turkish")
+    raise DeutschLoopError("Deadline must be YYYY-MM-DD, today/tomorrow, or a weekday in English, German, or Turkish")
 
 
 def _safe_moment(value: str | None) -> datetime | None:
@@ -220,7 +225,7 @@ def _safe_moment(value: str | None) -> datetime | None:
         return None
     try:
         return parse_moment(value)
-    except DeutschDNAError:
+    except DeutschLoopError:
         return None
 
 
@@ -421,9 +426,9 @@ def clean_label(label: str | None) -> str | None:
         return None
     value = label.strip()
     if not value:
-        raise DeutschDNAError("label must not be empty")
+        raise DeutschLoopError("label must not be empty")
     if len(value) > LABEL_MAX_LENGTH:
-        raise DeutschDNAError(f"label must be at most {LABEL_MAX_LENGTH} characters")
+        raise DeutschLoopError(f"label must be at most {LABEL_MAX_LENGTH} characters")
     return value
 
 
@@ -956,13 +961,19 @@ def similar_patterns(mistakes: list[dict[str, Any]], key: str, *, exclude_id: st
 # --------------------------------------------------------------------------- storage
 
 
+def standard_home() -> Path:
+    """~/.deutschloop, or ~/.deutschdna for a learner who started before the rename and has no new folder."""
+    home, legacy = Path.home() / ".deutschloop", Path.home() / ".deutschdna"
+    return legacy if legacy.is_dir() and not home.exists() else home
+
+
 def default_home(explicit: str | None = None) -> Path:
     if explicit:
         return Path(explicit).expanduser()
-    configured = os.environ.get("DEUTSCHDNA_HOME")
+    configured = _setting("HOME")
     if configured:
         return Path(configured).expanduser()
-    return Path.home() / ".deutschdna"
+    return standard_home()
 
 
 def _read_json(path: Path, fallback: dict[str, Any]) -> dict[str, Any]:
@@ -971,9 +982,9 @@ def _read_json(path: Path, fallback: dict[str, Any]) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise DeutschDNAError(f"Could not read valid JSON from {path}") from exc
+        raise DeutschLoopError(f"Could not read valid JSON from {path}") from exc
     if not isinstance(value, dict):
-        raise DeutschDNAError(f"Expected a JSON object in {path}")
+        raise DeutschLoopError(f"Expected a JSON object in {path}")
     return value
 
 
@@ -1003,7 +1014,7 @@ def state_lock(home: Path, *, timeout: float = LOCK_TIMEOUT_SECONDS) -> Iterator
                 locked = True
             except OSError:
                 if time.monotonic() >= deadline:
-                    raise DeutschDNAError(f"Another DeutschDNA command kept {home} busy for {timeout:g}s; try again") from None
+                    raise DeutschLoopError(f"Another DeutschLoop command kept {home} busy for {timeout:g}s; try again") from None
                 time.sleep(0.02)
         yield
     finally:
@@ -1035,7 +1046,7 @@ def _atomic_write(path: Path, value: dict[str, Any]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise DeutschDNAError(f"Could not create the state directory {path.parent}: {exc}") from exc
+        raise DeutschLoopError(f"Could not create the state directory {path.parent}: {exc}") from exc
     temporary_path = path.parent / f"{path.name}.{uuid.uuid4().hex}.tmp"
     try:
         with temporary_path.open("x", encoding="utf-8", newline="\n") as temporary:
@@ -1049,10 +1060,10 @@ def _atomic_write(path: Path, value: dict[str, Any]) -> None:
             temporary_path.unlink()
         except OSError:
             pass
-        if isinstance(exc, DeutschDNAError):
+        if isinstance(exc, DeutschLoopError):
             raise
         if isinstance(exc, OSError):
-            raise DeutschDNAError(f"Could not write state file {path}: {exc}") from exc
+            raise DeutschLoopError(f"Could not write state file {path}: {exc}") from exc
         raise
 
 
@@ -1127,7 +1138,7 @@ class StateStore:
         self.ensure()
         document = _read_json(self.vocabulary_path, {"schema_version": VOCABULARY_SCHEMA_VERSION, "words": []})
         if not isinstance(document.get("words"), list):
-            raise DeutschDNAError(f"Expected a words list in {self.vocabulary_path}")
+            raise DeutschLoopError(f"Expected a words list in {self.vocabulary_path}")
         return document
 
     def _remove_scene_words(self, key: str, session_id: str | None = None) -> None:
@@ -1153,27 +1164,27 @@ class StateStore:
         self.ensure()
         document = _read_json(self.mistakes_path, {"schema_version": SCHEMA_VERSION, "mistakes": []})
         if not isinstance(document.get("mistakes"), list):
-            raise DeutschDNAError(f"Expected a mistakes list in {self.mistakes_path}")
+            raise DeutschLoopError(f"Expected a mistakes list in {self.mistakes_path}")
         return _migrate_mistakes(drop_legacy_fields(document))
 
     def _session_document(self) -> dict[str, Any]:
         self.ensure()
         document = _read_json(self.sessions_path, {"schema_version": SCHEMA_VERSION, "sessions": []})
         if not isinstance(document.get("sessions"), list):
-            raise DeutschDNAError(f"Expected a sessions list in {self.sessions_path}")
+            raise DeutschLoopError(f"Expected a sessions list in {self.sessions_path}")
         return drop_legacy_fields(document)
 
     def _mission_document(self) -> dict[str, Any]:
         document = _read_json(self.missions_path, {"schema_version": MISSION_SCHEMA_VERSION, "missions": []})
         if not isinstance(document.get("missions"), list):
-            raise DeutschDNAError(f"Expected a missions list in {self.missions_path}")
+            raise DeutschLoopError(f"Expected a missions list in {self.missions_path}")
         return document
 
     @staticmethod
     def _require_session(document: dict[str, Any], identifier: str) -> dict[str, Any]:
         session = next((item for item in document["sessions"] if item.get("id") == identifier), None)
         if session is None:
-            raise DeutschDNAError(f"Unknown session ID: {identifier}")
+            raise DeutschLoopError(f"Unknown session ID: {identifier}")
         return session
 
     def _session_feedback(self, session_id: str, mistake: dict[str, Any], example: dict[str, Any]) -> None:
@@ -1205,7 +1216,7 @@ class StateStore:
     def _require(self, mistakes: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
         mistake = self._find(mistakes, identifier)
         if not mistake:
-            raise DeutschDNAError(f"Unknown mistake ID: {identifier}")
+            raise DeutschLoopError(f"Unknown mistake ID: {identifier}")
         return mistake
 
     @staticmethod
@@ -1214,7 +1225,7 @@ class StateStore:
     ) -> tuple[dict[str, Any] | None, str | None]:
         key = pattern_key(pattern)
         if not key:
-            raise DeutschDNAError("pattern must contain letters or digits")
+            raise DeutschLoopError("pattern must contain letters or digits")
         exact = StateStore._find(mistakes, mistake_id_for(category, key))
         if exact:
             return exact, "id"
@@ -1315,7 +1326,7 @@ class StateStore:
         at: datetime | None = None,
     ) -> dict[str, Any]:
         if starting_point is not None and starting_point not in STARTING_POINTS:
-            raise DeutschDNAError("starting_point must be beginner, some, comfortable, or unsure")
+            raise DeutschLoopError("starting_point must be beginner, some, comfortable, or unsure")
         moment = at or utc_now()
         profile_was_missing = not self.profile_path.exists()
         self.ensure()
@@ -1362,18 +1373,18 @@ class StateStore:
     ) -> tuple[dict[str, Any], str, dict[str, Any]]:
         label = clean_label(label)
         if not original.strip() or not corrected.strip():
-            raise DeutschDNAError("original and corrected must not be empty")
+            raise DeutschLoopError("original and corrected must not be empty")
         moment = at or utc_now()
         if bool(session_id) != bool(turn_id):
-            raise DeutschDNAError("Session feedback requires both --session-id and --turn-id")
+            raise DeutschLoopError("Session feedback requires both --session-id and --turn-id")
         session = None
         if session_id:
             session = self._require_session(self._session_document(), session_id)
             if session.get("status") != "debriefing":
-                raise DeutschDNAError("Stop the scene before recording feedback; only debriefing sessions accept corrections")
+                raise DeutschLoopError("Stop the scene before recording feedback; only debriefing sessions accept corrections")
             turn = next((item for item in session.get("utterances", []) if item["id"] == turn_id), None)
             if not turn or turn["speaker"] != "learner" or original.strip() not in turn["text"]:
-                raise DeutschDNAError("The original must be an actual sentence from the referenced learner turn")
+                raise DeutschLoopError("The original must be an actual sentence from the referenced learner turn")
             moment = parse_moment(turn["at"])
         document = self._mistake_document()
         mistakes = document["mistakes"]
@@ -1385,15 +1396,15 @@ class StateStore:
             resolved_by = "mistake_id"
         else:
             if not (category and pattern and rule) or not pattern.strip() or not rule.strip():
-                raise DeutschDNAError("Provide --mistake-id, or --category, --pattern, and --rule")
+                raise DeutschLoopError("Provide --mistake-id, or --category, --pattern, and --rule")
             if category not in CATEGORIES:
-                raise DeutschDNAError(f"Unknown category '{category}'. Choose from: {', '.join(CATEGORY_ORDER)}")
+                raise DeutschLoopError(f"Unknown category '{category}'. Choose from: {', '.join(CATEGORY_ORDER)}")
             existing, resolved_by = self._resolve(mistakes, category, pattern)
 
         if session and session.get("input_mode") == "transcript":
             error_category = existing["category"] if existing else category
             if error_category in {"spelling", "punctuation"}:
-                raise DeutschDNAError("A speech transcript cannot establish learner spelling or punctuation errors")
+                raise DeutschLoopError("A speech transcript cannot establish learner spelling or punctuation errors")
         effective_event_id = event_id or auto_event_id(original, corrected)
         if session is not None:
             identity = existing["id"] if existing else mistake_id_for(category, pattern_key(pattern))
@@ -1521,7 +1532,7 @@ class StateStore:
         at: datetime | None = None,
     ) -> list[dict[str, Any]]:
         if not context or not context.strip():
-            raise DeutschDNAError("Provide the learner's unprompted sentence with --context")
+            raise DeutschLoopError("Provide the learner's unprompted sentence with --context")
         context = context.strip()
         moment = at or utc_now()
         document = self._mistake_document()
@@ -1575,15 +1586,15 @@ class StateStore:
     ) -> dict[str, Any]:
         """Remember how an exercise went; guided practice never changes the review ladder."""
         if outcome not in {"independent", "assisted", "shown", "miss"}:
-            raise DeutschDNAError("outcome must be independent, assisted, shown, or miss")
+            raise DeutschLoopError("outcome must be independent, assisted, shown, or miss")
         prompt, answer = prompt.strip(), answer.strip()
         strategy, hint = (strategy or "").strip() or None, (hint or "").strip() or None
         if not prompt or not answer:
-            raise DeutschDNAError("Provide the actual --prompt and --answer")
+            raise DeutschLoopError("Provide the actual --prompt and --answer")
         if bool(strategy) != bool(hint) or (outcome in {"assisted", "shown"} and not hint):
-            raise DeutschDNAError("Record both --strategy and the actual --hint for supported practice")
+            raise DeutschLoopError("Record both --strategy and the actual --hint for supported practice")
         if outcome == "independent" and hint:
-            raise DeutschDNAError("An independent answer cannot include a hint; use assisted or shown")
+            raise DeutschLoopError("An independent answer cannot include a hint; use assisted or shown")
         moment = at or utc_now()
         document = self._mistake_document()
         mistake = self._require(document["mistakes"], identifier)
@@ -1596,7 +1607,7 @@ class StateStore:
             text_fingerprint(prompt) in mistake.get("seen_prompts", [])
             or text_fingerprint(answer) in mistake.get("seen_answers", [])
         ):
-            raise DeutschDNAError("Independent practice needs a new situation and answer; copied corrections are shown")
+            raise DeutschLoopError("Independent practice needs a new situation and answer; copied corrections are shown")
         _snapshot(mistake, "coach", moment)
         proof = independent_use(mistake, answer, moment, source="practice", prompt=prompt) if outcome == "independent" else None
         entry = append_coaching(mistake, **fields, moment=moment)
@@ -1653,7 +1664,7 @@ class StateStore:
         at: datetime | None = None,
     ) -> tuple[dict[str, Any], str]:
         if result not in {"pass", "hard", "fail"}:
-            raise DeutschDNAError("result must be pass, hard, or fail")
+            raise DeutschLoopError("result must be pass, hard, or fail")
         moment = at or utc_now()
         document = self._mistake_document()
         mistake = self._require(document["mistakes"], identifier)
@@ -1661,11 +1672,11 @@ class StateStore:
         prompt = (prompt or "").strip()
         strategy, hint = (strategy or "").strip() or None, (hint or "").strip() or None
         if not prompt or not clean_answer:
-            raise DeutschDNAError("A review requires the actual --prompt and --answer; use coach for guided practice")
+            raise DeutschLoopError("A review requires the actual --prompt and --answer; use coach for guided practice")
         if bool(strategy) != bool(hint):
-            raise DeutschDNAError("Provide both --strategy and --hint")
+            raise DeutschLoopError("Provide both --strategy and --hint")
         if result == "pass" and hint:
-            raise DeutschDNAError("A hinted answer cannot pass; use hard or coach")
+            raise DeutschLoopError("A hinted answer cannot pass; use hard or coach")
 
         history = mistake.get("review_history") or []
         last = history[-1] if history else None
@@ -1682,11 +1693,11 @@ class StateStore:
 
         next_review = _safe_moment(mistake.get("next_review"))
         if mistake.get("status") != "active" or next_review is None or next_review > moment:
-            raise DeutschDNAError("This pattern is not due; use coach for practice without advancing the schedule")
+            raise DeutschLoopError("This pattern is not due; use coach for practice without advancing the schedule")
         if text_fingerprint(prompt) in mistake.get("seen_prompts", []):
-            raise DeutschDNAError("This review prompt was already used; ask a new situation")
+            raise DeutschLoopError("This review prompt was already used; ask a new situation")
         if result == "pass" and text_fingerprint(clean_answer) in mistake.get("seen_answers", []):
-            raise DeutschDNAError("This answer was already seen; test transfer with a new sentence")
+            raise DeutschLoopError("This answer was already seen; test transfer with a new sentence")
         _snapshot(mistake, "grade", moment)
         mistake["review_attempts"] = int(mistake.get("review_attempts", 0)) + 1
         if result == "pass":
@@ -1743,9 +1754,9 @@ class StateStore:
 
     def list(self, *, status: str = "active", category: str | None = None, verbose: bool = False) -> list[dict[str, Any]]:
         if status not in {"active", "mastered", "all"}:
-            raise DeutschDNAError("status must be active, mastered, or all")
+            raise DeutschLoopError("status must be active, mastered, or all")
         if category is not None and category not in CATEGORIES:
-            raise DeutschDNAError(f"Unknown category '{category}'. Choose from: {', '.join(CATEGORY_ORDER)}")
+            raise DeutschLoopError(f"Unknown category '{category}'. Choose from: {', '.join(CATEGORY_ORDER)}")
         view = row_view(verbose)
         rows = [
             view(mistake)
@@ -1774,14 +1785,14 @@ class StateStore:
         mistake = self._require(mistakes, identifier)
         snapshot = mistake.get("undo")
         if not snapshot:
-            raise DeutschDNAError(
+            raise DeutschLoopError(
                 f"Nothing to undo for {identifier}: only the latest record, grade, observe, coach, or merge can be undone"
             )
         undone = {"undone": snapshot.get("action"), "undone_at": snapshot.get("at")}
         if snapshot.get("action") == "merge":
             source = snapshot["merged_source"]
             if self._find(mistakes, source["id"]):
-                raise DeutschDNAError(f"Cannot undo the merge: {source['id']} exists again")
+                raise DeutschLoopError(f"Cannot undo the merge: {source['id']} exists again")
             restored = snapshot["state"]
             mistakes[mistakes.index(mistake)] = restored
             mistakes.insert(min(int(snapshot.get("source_index", len(mistakes))), len(mistakes)), source)
@@ -1807,7 +1818,7 @@ class StateStore:
 
     def merge(self, source_id: str, target_id: str, *, at: datetime | None = None) -> dict[str, Any]:
         if source_id == target_id:
-            raise DeutschDNAError("source and target must be different mistake IDs")
+            raise DeutschLoopError("source and target must be different mistake IDs")
         moment = at or utc_now()
         document = self._mistake_document()
         mistakes = document["mistakes"]
@@ -1883,23 +1894,23 @@ class StateStore:
         label: str | None = None,
     ) -> dict[str, Any]:
         if pattern is None and category is None and rule is None and label is None:
-            raise DeutschDNAError("Provide --pattern, --category, --rule, or --label")
+            raise DeutschLoopError("Provide --pattern, --category, --rule, or --label")
         label = clean_label(label)
         document = self._mistake_document()
         mistakes = document["mistakes"]
         mistake = self._require(mistakes, identifier)
         if category is not None and category not in CATEGORIES:
-            raise DeutschDNAError(f"Unknown category '{category}'. Choose from: {', '.join(CATEGORY_ORDER)}")
+            raise DeutschLoopError(f"Unknown category '{category}'. Choose from: {', '.join(CATEGORY_ORDER)}")
         if pattern is not None and not pattern.strip():
-            raise DeutschDNAError("pattern must not be empty")
+            raise DeutschLoopError("pattern must not be empty")
         if rule is not None and not rule.strip():
-            raise DeutschDNAError("rule must not be empty")
+            raise DeutschLoopError("rule must not be empty")
 
         new_category = category or mistake["category"]
         new_pattern = pattern.strip() if pattern else mistake["pattern"]
         new_key = pattern_key(new_pattern)
         if not new_key:
-            raise DeutschDNAError("pattern must contain letters or digits")
+            raise DeutschLoopError("pattern must contain letters or digits")
         new_id = mistake_id_for(new_category, new_key)
         previous_id = mistake["id"]
         if new_id != previous_id:
@@ -1907,7 +1918,7 @@ class StateStore:
                 (item for item in mistakes if item is not mistake and item.get("pattern_key") == new_key), None
             )
             if clash:
-                raise DeutschDNAError(
+                raise DeutschLoopError(
                     f"'{new_pattern}' already exists as {clash['id']}; run: merge {previous_id} {clash['id']}"
                 )
         if (new_category, new_key) != (mistake["category"], mistake.get("pattern_key")):
@@ -2201,7 +2212,7 @@ class StateStore:
         goal = goal.strip()
         scenario = SCENARIO_ALIASES.get(scenario, scenario)
         if not goal or scenario not in SCENARIOS:
-            raise DeutschDNAError("Provide a real learner-stated goal and a supported scenario")
+            raise DeutschLoopError("Provide a real learner-stated goal and a supported scenario")
         resolved = parse_deadline(deadline, moment)
         document = self._mission_document()
         existing = next((item for item in document["missions"] if item["status"] == "active"
@@ -2221,7 +2232,7 @@ class StateStore:
     def _require_mission(document: dict[str, Any], identifier: str) -> dict[str, Any]:
         mission = next((item for item in document["missions"] if item.get("id") == identifier), None)
         if mission is None:
-            raise DeutschDNAError(f"Unknown mission ID: {identifier}")
+            raise DeutschLoopError(f"Unknown mission ID: {identifier}")
         return mission
 
     def mission_show(self, identifier: str, *, at: datetime | None = None) -> dict[str, Any]:
@@ -2231,7 +2242,7 @@ class StateStore:
 
     def mission_list(self, *, status: str = "active", at: datetime | None = None) -> list[dict[str, Any]]:
         if status not in {"active", "completed", "cancelled", "all"}:
-            raise DeutschDNAError("Unknown mission status")
+            raise DeutschLoopError("Unknown mission status")
         moment = at or utc_now()
         sessions = _read_json(self.sessions_path, {"sessions": []})["sessions"]
         missions = [mission_view(item, moment, sessions) for item in self._mission_document()["missions"]
@@ -2244,11 +2255,11 @@ class StateStore:
         mission = self._require_mission(self._mission_document(), identifier)
         view = self.mission_show(identifier, at=moment)
         if not 1 <= minutes <= 60 or input_mode not in {"text", "transcript"}:
-            raise DeutschDNAError("Use 1–60 minutes and text/transcript input")
+            raise DeutschLoopError("Use 1–60 minutes and text/transcript input")
         if moment < parse_moment(mission["updated_at"]):
-            raise DeutschDNAError("A mission scene cannot precede its saved progress")
+            raise DeutschLoopError("A mission scene cannot precede its saved progress")
         if mission["status"] != "active":
-            raise DeutschDNAError("This mission is not active")
+            raise DeutschLoopError("This mission is not active")
         index = mission["step_index"]
         step = mission["steps"][index]
         sessions = self._session_document()["sessions"]
@@ -2258,7 +2269,7 @@ class StateStore:
             return {"status": "resume", **pending, "mission": view, "next_action": view["next_action"]}
         unfinished = [item for item in sessions if item.get("status") in {"active", "debriefing"}]
         if unfinished:
-            raise DeutschDNAError(f"Finish or resume scene {unfinished[-1]['id']} before starting a mission scene")
+            raise DeutschLoopError(f"Finish or resume scene {unfinished[-1]['id']} before starting a mission scene")
         attempts = mission.get("attempts") or []
         last = attempts[-1] if attempts else None
         previous_scene = next((item for item in sessions if last and item["id"] == last["session_id"]), None)
@@ -2288,37 +2299,37 @@ class StateStore:
                        evidence_turn_ids: list[str], note: str, at: datetime | None = None) -> dict[str, Any]:
         moment = at or utc_now()
         if result not in {"achieved", "practice"} or support not in {"none", "hint", "shown"} or not note.strip():
-            raise DeutschDNAError("Provide achieved/practice, the actual support, and a grounded assessment note")
+            raise DeutschLoopError("Provide achieved/practice, the actual support, and a grounded assessment note")
         document = self._mission_document()
         mission = self._require_mission(document, identifier)
         session = self._require_session(self._session_document(), session_id)
         if session.get("mission_id") != identifier or session.get("status") != "complete":
-            raise DeutschDNAError("Assess a completed scene belonging to this mission")
+            raise DeutschLoopError("Assess a completed scene belonging to this mission")
         if moment < parse_moment(session.get("finished_at") or session["ended_at"]):
-            raise DeutschDNAError("A mission assessment cannot precede its completed scene")
+            raise DeutschLoopError("A mission assessment cannot precede its completed scene")
         ids = list(dict.fromkeys(evidence_turn_ids))
         if not ids:
-            raise DeutschDNAError("An assessment needs actual learner turn IDs as evidence")
+            raise DeutschLoopError("An assessment needs actual learner turn IDs as evidence")
         turns = {turn["id"]: turn for turn in session.get("utterances", [])}
         if any(key not in turns or turns[key]["speaker"] != "learner" for key in ids):
-            raise DeutschDNAError("Evidence must cite real learner turns from this scene")
+            raise DeutschLoopError("Evidence must cite real learner turns from this scene")
         observed = {turn.get("support", "none") for turn in session.get("utterances", []) if turn["speaker"] == "partner"}
         actual_support = "shown" if "shown" in observed or support == "shown" else "hint" if "hint" in observed or support == "hint" else "none"
         if result == "achieved" and actual_support != "none":
-            raise DeutschDNAError("A supported scene cannot count as achieved unaided; use practice")
+            raise DeutschLoopError("A supported scene cannot count as achieved unaided; use practice")
         attempts = mission["attempts"]
         previous = next((attempt for attempt in attempts if attempt["session_id"] == session_id), None)
         if previous:
             if (previous["result"], previous["support"], previous["note"], [row["turn_id"] for row in previous["evidence"]]) != (result, actual_support, note.strip(), ids):
-                raise DeutschDNAError("This scene was already assessed differently; undo the latest mission assessment first")
+                raise DeutschLoopError("This scene was already assessed differently; undo the latest mission assessment first")
             return {"status": "duplicate", "mission": self.mission_show(identifier, at=moment)}
         if moment < parse_moment(mission["updated_at"]):
-            raise DeutschDNAError("An assessment cannot precede saved mission progress")
+            raise DeutschLoopError("An assessment cannot precede saved mission progress")
         if mission["status"] != "active" or session.get("mission_step_id") != mission["steps"][mission["step_index"]]["id"]:
-            raise DeutschDNAError("This scene does not belong to the mission's current step")
+            raise DeutschLoopError("This scene does not belong to the mission's current step")
         pending = self.mission_show(identifier, at=moment)["pending_session_id"]
         if pending != session_id:
-            raise DeutschDNAError("Assess the mission's pending scene before any other scene")
+            raise DeutschLoopError("Assess the mission's pending scene before any other scene")
         attempt = {"session_id": session_id, "step_id": session["mission_step_id"], "result": result,
                    "support": actual_support, "note": note.strip(), "at": iso(moment),
                    "previous_index": mission["step_index"],
@@ -2338,12 +2349,12 @@ class StateStore:
         document = self._mission_document()
         mission = self._require_mission(document, identifier)
         if mission["status"] == "cancelled" or not mission["attempts"]:
-            raise DeutschDNAError("No mission assessment to undo")
+            raise DeutschLoopError("No mission assessment to undo")
         if moment < parse_moment(mission["updated_at"]):
-            raise DeutschDNAError("Undo cannot precede saved mission progress")
+            raise DeutschLoopError("Undo cannot precede saved mission progress")
         pending = self.mission_show(identifier, at=moment)["pending_session_id"]
         if pending:
-            raise DeutschDNAError("Assess the newer pending scene before undoing the latest assessment")
+            raise DeutschLoopError("Assess the newer pending scene before undoing the latest assessment")
         undone = mission["attempts"].pop()
         mission.update(step_index=undone["previous_index"], status="active", completed_at=None, updated_at=iso(moment))
         _atomic_write(self.missions_path, document)
@@ -2355,21 +2366,21 @@ class StateStore:
         document = self._mission_document()
         mission = self._require_mission(document, identifier)
         if mission["status"] != "active":
-            raise DeutschDNAError("Only an active mission can be updated")
+            raise DeutschLoopError("Only an active mission can be updated")
         if moment < parse_moment(mission["updated_at"]):
-            raise DeutschDNAError("An update cannot precede saved mission progress")
+            raise DeutschLoopError("An update cannot precede saved mission progress")
         if goal is None and deadline is None and not cancel:
-            raise DeutschDNAError("Provide a goal, deadline, or --cancel")
+            raise DeutschLoopError("Provide a goal, deadline, or --cancel")
         if goal is not None:
             if not goal.strip():
-                raise DeutschDNAError("A mission goal cannot be empty")
+                raise DeutschLoopError("A mission goal cannot be empty")
             mission["goal"] = goal.strip()
         if deadline is not None:
             mission["deadline"] = parse_deadline(deadline, moment)
         if cancel:
             pending = self.mission_show(identifier, at=moment)["pending_session_id"]
             if pending and self.roleplay_show(pending)["session"]["status"] != "complete":
-                raise DeutschDNAError("End and finish the current scene before cancelling its mission")
+                raise DeutschLoopError("End and finish the current scene before cancelling its mission")
             mission["status"] = "cancelled"
         mission["updated_at"] = iso(moment)
         _atomic_write(self.missions_path, document)
@@ -2389,11 +2400,11 @@ class StateStore:
     ) -> dict[str, Any]:
         scenario = SCENARIO_ALIASES.get(scenario, scenario)
         if scenario not in SCENARIOS:
-            raise DeutschDNAError(f"Unknown scenario '{scenario}'. Choose from: {', '.join(sorted(SCENARIOS))}")
+            raise DeutschLoopError(f"Unknown scenario '{scenario}'. Choose from: {', '.join(sorted(SCENARIOS))}")
         if not 1 <= minutes <= 60:
-            raise DeutschDNAError("minutes must be between 1 and 60")
+            raise DeutschLoopError("minutes must be between 1 and 60")
         if input_mode not in {"text", "transcript"}:
-            raise DeutschDNAError("input_mode must be text or transcript")
+            raise DeutschLoopError("input_mode must be text or transcript")
         moment = at or utc_now()
         focus_pattern = None
         if not focus and _mission_context and _mission_context["focus_patterns"]:
@@ -2456,9 +2467,9 @@ class StateStore:
     ) -> dict[str, Any]:
         """Store one actual utterance. There is no correction or grading on this path."""
         if speaker not in {"learner", "partner"} or not text.strip():
-            raise DeutschDNAError("Provide a learner or partner speaker and nonempty text")
+            raise DeutschLoopError("Provide a learner or partner speaker and nonempty text")
         if support not in {"none", "hint", "shown"} or (speaker != "partner" and support != "none"):
-            raise DeutschDNAError("Only a partner turn can record hint/shown support")
+            raise DeutschLoopError("Only a partner turn can record hint/shown support")
         moment = at or utc_now()
         document = self._session_document()
         session = self._require_session(document, identifier)
@@ -2466,16 +2477,16 @@ class StateStore:
         retry = next((turn for turn in utterances if event_id and turn.get("event_id") == event_id), None)
         if retry:
             if retry["text"] != text or retry["speaker"] != speaker or retry.get("support", "none") != support:
-                raise DeutschDNAError("This turn event ID already belongs to a different utterance")
+                raise DeutschLoopError("This turn event ID already belongs to a different utterance")
             return {"status": "duplicate", "utterance": retry, **session_timing(session, moment)}
         if speaker == "learner" and is_scene_end_request(text):
             self.roleplay_stop(identifier, at=moment)
             return {"status": "scene_ended", "control": "end_scene", **self.roleplay_show(identifier, at=moment)}
         if session.get("status") != "active":
-            raise DeutschDNAError("This scene is closed; start a new scene to continue")
+            raise DeutschLoopError("This scene is closed; start a new scene to continue")
         latest_at = utterances[-1]["at"] if utterances else session["started_at"]
         if moment < parse_moment(latest_at):
-            raise DeutschDNAError("A turn cannot precede the scene or its previous turn")
+            raise DeutschLoopError("A turn cannot precede the scene or its previous turn")
         if not event_id and utterances:
             latest = utterances[-1]
             if latest["speaker"] == speaker and latest["text"] == text and latest.get("support", "none") == support and within(latest["at"], moment, DUPLICATE_EVENT_WINDOW):
@@ -2496,7 +2507,7 @@ class StateStore:
             return session
         latest_at = (session.get("utterances") or [{"at": session["started_at"]}])[-1]["at"]
         if moment < parse_moment(latest_at):
-            raise DeutschDNAError("A scene cannot end before its last turn")
+            raise DeutschLoopError("A scene cannot end before its last turn")
         session.update({"status": "debriefing", "ended_at": iso(moment),
                         "duration_seconds": int((moment - parse_moment(session["started_at"])).total_seconds()),
                         "duration_source": "elapsed", "turns": session_timing(session, moment)["learner_turns"]})
@@ -2509,13 +2520,13 @@ class StateStore:
         document = self._session_document()
         session = self._require_session(document, identifier)
         if session.get("status") != "debriefing":
-            raise DeutschDNAError("Vocabulary is collected in the debrief after stopping the scene")
+            raise DeutschLoopError("Vocabulary is collected in the debrief after stopping the scene")
         turn = next((item for item in session.get("utterances", []) if item["id"] == turn_id), None)
         term, meaning, surface = term.strip(), meaning.strip(), (surface or term).strip()
         if not term or not meaning or not surface or not turn:
-            raise DeutschDNAError("Provide a term, meaning and an actual source turn")
+            raise DeutschLoopError("Provide a term, meaning and an actual source turn")
         if not re.search(r"(?<!\w)" + re.escape(surface) + r"(?!\w)", turn["text"], re.IGNORECASE):
-            raise DeutschDNAError("The vocabulary surface must occur in the referenced turn")
+            raise DeutschLoopError("The vocabulary surface must occur in the referenced turn")
         entry = {"term": term, "meaning": meaning, "surface": surface, "turn_id": turn_id, "example": turn["text"]}
         vocabulary = session.setdefault("vocabulary", [])
         key = word_key(term)
@@ -2532,7 +2543,7 @@ class StateStore:
             return {"status": "duplicate", "vocabulary": vocabulary, "deck": deck_status,
                     "word": word_view(word, parse_moment(turn["at"]))}
         if len(vocabulary) >= SCENE_VOCABULARY_LIMIT:
-            raise DeutschDNAError(f"Keep at most {SCENE_VOCABULARY_LIMIT} useful vocabulary items per scene")
+            raise DeutschLoopError(f"Keep at most {SCENE_VOCABULARY_LIMIT} useful vocabulary items per scene")
         vocabulary.append(entry)
         # Every scene word enters the deck; a word met before gets one more source, not a new schedule.
         word, deck_status = self._add_scene_word(deck, session, entry, turn)
@@ -2559,7 +2570,7 @@ class StateStore:
 
     def vocab_list(self, *, status: str = "all") -> list[dict[str, Any]]:
         if status not in {"active", "mastered", "all"}:
-            raise DeutschDNAError("status must be active, mastered, or all")
+            raise DeutschLoopError("status must be active, mastered, or all")
         words = [word for word in self._vocabulary_document()["words"] if status == "all" or word.get("status") == status]
         return sorted(words, key=lambda word: (word.get("status") != "active", word.get("next_review") or "~", word["key"]))
 
@@ -2573,7 +2584,7 @@ class StateStore:
     def _require_word(words: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
         word = next((item for item in words if item.get("id") == identifier), None)
         if word is None:
-            raise DeutschDNAError(f"Unknown word ID: {identifier}")
+            raise DeutschLoopError(f"Unknown word ID: {identifier}")
         return word
 
     def vocab_grade(
@@ -2582,11 +2593,11 @@ class StateStore:
     ) -> tuple[dict[str, Any], str]:
         """A word review: the learner produced the word in a sentence for a new situation."""
         if result not in {"pass", "hard", "fail"}:
-            raise DeutschDNAError("result must be pass, hard, or fail")
+            raise DeutschLoopError("result must be pass, hard, or fail")
         prompt, answer = prompt.strip(), answer.strip()
         correction = (correction or "").strip() or None
         if not prompt or not answer:
-            raise DeutschDNAError("A word review requires the actual --prompt and the learner's --answer")
+            raise DeutschLoopError("A word review requires the actual --prompt and the learner's --answer")
         moment = at or utc_now()
         document = self._vocabulary_document()
         word = self._require_word(document["words"], identifier)
@@ -2596,11 +2607,11 @@ class StateStore:
                 and within(last.get("reviewed_at"), moment, DUPLICATE_EVENT_WINDOW)):
             return word, "duplicate"
         if not _is_due(word, moment):
-            raise DeutschDNAError("This word is not due; review it when vocab-due lists it")
+            raise DeutschLoopError("This word is not due; review it when vocab-due lists it")
         if text_fingerprint(prompt) in word.get("seen_prompts", []):
-            raise DeutschDNAError("This word prompt was already used; ask a new situation")
+            raise DeutschLoopError("This word prompt was already used; ask a new situation")
         if result == "pass" and text_fingerprint(answer) in word.get("seen_answers", []):
-            raise DeutschDNAError("This sentence was already seen; a pass needs a new sentence")
+            raise DeutschLoopError("This sentence was already seen; a pass needs a new sentence")
         _snapshot(word, "grade", moment)
         if result == "pass":
             step = int(word.get("review_step", 0)) + 1
@@ -2632,7 +2643,7 @@ class StateStore:
         word = self._require_word(document["words"], identifier)
         snapshot = word.get("undo")
         if not snapshot:
-            raise DeutschDNAError(f"Nothing to undo for {identifier}: only its latest grade or scene addition can be undone")
+            raise DeutschLoopError(f"Nothing to undo for {identifier}: only its latest grade or scene addition can be undone")
         undone = {"undone": snapshot.get("action"), "undone_at": snapshot.get("at")}
         if snapshot.get("action") == "add":
             scene = snapshot.get("scene") or {}
@@ -2690,17 +2701,17 @@ class StateStore:
         ended = _safe_moment(session.get("ended_at")) or moment
         started = _safe_moment(session.get("started_at"))
         if moment < ended:
-            raise DeutschDNAError("Feedback cannot be finished before the scene ended")
+            raise DeutschLoopError("Feedback cannot be finished before the scene ended")
         if started and ended < started:
-            raise DeutschDNAError("A scene cannot end before it starts")
+            raise DeutschLoopError("A scene cannot end before it starts")
         if session.get("utterances"):
             if ended < parse_moment(session["utterances"][-1]["at"]):
-                raise DeutschDNAError("A scene cannot end before its last turn")
+                raise DeutschLoopError("A scene cannot end before its last turn")
             count = session_timing(session, ended)["learner_turns"]
             if turns is not None and turns != count:
-                raise DeutschDNAError("The supplied turn count disagrees with the recorded learner turns")
+                raise DeutschLoopError("The supplied turn count disagrees with the recorded learner turns")
             if duration_seconds is not None:
-                raise DeutschDNAError("Recorded scenes use elapsed time; speaking duration is not measured")
+                raise DeutschLoopError("Recorded scenes use elapsed time; speaking duration is not measured")
             turns = count
         elif turns is None:
             turns = 0
@@ -2824,7 +2835,7 @@ def _in_a_row(days: int) -> str:
 
 def _heading(profile: dict[str, Any]) -> list[str]:
     """The card title: the learner's name and level only when they gave them."""
-    parts = ["DeutschDNA"]
+    parts = ["FehlerDNA"]
     if profile.get("name"):
         parts.append(profile["name"])
     if profile.get("level") and profile["level"] != "unspecified":
@@ -2872,7 +2883,7 @@ def render_summary_text(summary: dict[str, Any]) -> str:
     ]
     categories = summary["categories"]
     if not categories:
-        lines.append("Noch keine Fehler gespeichert. Deine DNA entsteht, während du schreibst.")
+        lines.append("Noch keine Fehler gespeichert. Deine FehlerDNA entsteht, während du schreibst.")
         return "\n".join(lines + _vocabulary_lines(summary))
     for category in sorted(categories, key=category_rank):
         bucket = categories[category]
@@ -2918,7 +2929,7 @@ def render_recap_text(recap: dict[str, Any]) -> str:
     gap = recap["days_since_last_activity"]
     if gap is None:
         return (f"Willkommen, {name}!" if name else "Willkommen!") + (
-            "\nNoch keine Einträge. Schreib ein paar Sätze auf Deutsch, dann entsteht deine DeutschDNA."
+            "\nNoch keine Einträge. Schreib ein paar Sätze auf Deutsch, dann entsteht deine FehlerDNA."
         )
     when = "heute" if gap == 0 else ("gestern" if gap == 1 else f"vor {gap} Tagen")
     errors = recap["errors"]
@@ -2989,7 +3000,7 @@ def render_recap_card(recap: dict[str, Any]) -> str:
     """The session header and a board of the patterns in progress. Every value comes from the recap."""
     head = _heading(recap["profile"])
     if recap.get("last_activity_at") is None:
-        return " · ".join(head) + "\nNoch keine Einträge. Schreib ein paar Sätze auf Deutsch, dann entsteht deine DNA."
+        return " · ".join(head) + "\nNoch keine Einträge. Schreib ein paar Sätze auf Deutsch, dann entsteht deine FehlerDNA."
     return "\n".join(_recap_card_lines(recap, head) + _vocabulary_lines(recap))
 
 
@@ -3255,7 +3266,7 @@ def dashboard_snapshot(store: StateStore, *, at: datetime | None = None) -> dict
     profile = _read_json(store.profile_path, {})
     document = _read_json(store.mistakes_path, {"schema_version": SCHEMA_VERSION, "mistakes": []})
     if not isinstance(document.get("mistakes"), list):
-        raise DeutschDNAError(f"Expected a mistakes list in {store.mistakes_path}")
+        raise DeutschLoopError(f"Expected a mistakes list in {store.mistakes_path}")
     mistakes = _migrate_mistakes(drop_legacy_fields(document))["mistakes"]
     patterns = []
     for mistake in mistakes:
@@ -3325,17 +3336,17 @@ def render_dashboard(payload: dict[str, Any]) -> str:
     for original, escaped in (("&", "\\u0026"), ("<", "\\u003c"), (">", "\\u003e"),
                               ("\u2028", "\\u2028"), ("\u2029", "\\u2029")):
         data = data.replace(original, escaped)
-    return template.replace("__DEUTSCHDNA_DATA__", data)
+    return template.replace("__DEUTSCHLOOP_DATA__", data)
 
 
 def write_dashboard(payload: dict[str, Any], output: Path, *, force: bool = False) -> dict[str, Any]:
     output = output.expanduser().resolve()
     if output.suffix.lower() not in {".html", ".htm"}:
-        raise DeutschDNAError("Dashboard output must end in .html or .htm")
+        raise DeutschLoopError("Dashboard output must end in .html or .htm")
     if output == Path(__file__).with_name("dashboard.html").resolve():
-        raise DeutschDNAError("Choose an output outside the dashboard source template")
+        raise DeutschLoopError("Choose an output outside the dashboard source template")
     if output.exists() and not force:
-        raise DeutschDNAError(f"{output} already exists; choose another file or use --force")
+        raise DeutschLoopError(f"{output} already exists; choose another file or use --force")
     temporary = output.parent / f".{output.name}.{uuid.uuid4().hex}.tmp"
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -3349,7 +3360,7 @@ def write_dashboard(payload: dict[str, Any], output: Path, *, force: bool = Fals
             with output.open("x", encoding="utf-8", newline="\n") as stream:
                 stream.write(html)
     except OSError as exc:
-        raise DeutschDNAError(f"Could not export dashboard to {output}: {exc}") from exc
+        raise DeutschLoopError(f"Could not export dashboard to {output}: {exc}") from exc
     finally:
         temporary.unlink(missing_ok=True)
     return {"status": "exported", "path": str(output), "frames": len(payload["frames"]),
@@ -3392,8 +3403,8 @@ def _add_verbose(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="DeutschDNA local mistake memory and review engine")
-    parser.add_argument("--home", help="State directory; overrides DEUTSCHDNA_HOME")
+    parser = argparse.ArgumentParser(description="DeutschLoop local mistake memory and review engine")
+    parser.add_argument("--home", help="State directory; overrides DEUTSCHLOOP_HOME")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="Create or update the learner profile")
@@ -3492,7 +3503,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_verbose(summary_parser)
 
     dashboard_parser = subparsers.add_parser("dashboard", help="Export a self-contained, offline learning dashboard")
-    dashboard_parser.add_argument("--output", default="deutschdna-dashboard.html", help="HTML file to create")
+    dashboard_parser.add_argument("--output", default="deutschloop-dashboard.html", help="HTML file to create")
     dashboard_parser.add_argument("--force", action="store_true", help="Replace an existing HTML export")
     dashboard_parser.add_argument("--at", help="Clock for due dates; does not reconstruct historical state")
 
@@ -3816,7 +3827,7 @@ def _run_locked(store: StateStore, arguments: argparse.Namespace) -> dict[str, A
             at=parse_moment(arguments.at),
         )
         return {"status": "finished", **store.roleplay_show(session["id"])}
-    raise DeutschDNAError(f"Unsupported command: {command}")
+    raise DeutschLoopError(f"Unsupported command: {command}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -3833,7 +3844,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _print_json(result)
         return 0
-    except DeutschDNAError as exc:
+    except DeutschLoopError as exc:
         _print_json({"error": str(exc), **({"code": exc.code} if exc.code else {})}, stream=sys.stderr)
         return 2
 

@@ -1,6 +1,6 @@
 # Speaking scenes
 
-The learner chooses a situation and talks to a character. Corrections wait until the scene ends. `speak restaurant`, “Restoranda konuşalım”, and “Rollenspiel Restaurant” select this mode. With the installed skill name, the invocation is `/deutsch-dna speak restaurant` in Claude Code or `$deutsch-dna speak restaurant` in Codex. Do not claim `/deutsch` is a registered shortcut; the skill is named `deutsch-dna`.
+The learner chooses a situation and talks to a character. Corrections wait until the scene ends. `speak restaurant`, “Restoranda konuşalım”, and “Rollenspiel Restaurant” select this mode. With the installed skill name, the invocation is `/deutsch-loop speak restaurant` in Claude Code or `$deutsch-loop speak restaurant` in Codex. Do not claim `/deutsch` is a registered shortcut; the skill is named `deutsch-loop`.
 
 ## “Bitir” means deliver the evaluation
 
@@ -13,7 +13,7 @@ In voice, make the switch from character to tutor explicit and relay the short e
 ## Start immediately
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py speak restaurant --minutes 5
+python <skill-root>/scripts/deutsch_loop.py speak restaurant --minutes 5
 ```
 
 `roleplay-start --scenario restaurant` remains supported. There are fifteen scenarios; `scenarios` returns their openings and example situations. English aliases such as `interview`, `presentation`, `train`, `shopping`, `phone`, and `customer-service` work with `speak`. The default target is five minutes. This is an approximate scene length: time is checked when a turn is logged, so do not promise to interrupt at exactly five minutes or wait on a timer.
@@ -33,8 +33,8 @@ Use the actual learner's name only if they supplied it. Do not fabricate “Alex
 Log actual utterances as they happen. Use the actual partner line you deliver and the learner's verbatim input:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py roleplay-turn s_... --speaker partner --text 'Guten Abend. Haben Sie reserviert?' --event-id message-1
-python <skill-root>/scripts/deutsch_dna.py roleplay-turn s_... --speaker learner --text 'Ja wir haben eine reservierung für zwei person.' --event-id message-2
+python <skill-root>/scripts/deutsch_loop.py roleplay-turn s_... --speaker partner --text 'Guten Abend. Haben Sie reserviert?' --event-id message-1
+python <skill-root>/scripts/deutsch_loop.py roleplay-turn s_... --speaker learner --text 'Ja wir haben eine reservierung für zwei person.' --event-id message-2
 ```
 
 Keep the returned turn IDs for the debrief. Use source message IDs when available, or one stable ID per actual message; reuse only for a retry. A repeated sentence in a different learner message is a different turn. The CLI logs text and time without grading it. Keep all local state operations out of the spoken dialogue.
@@ -55,7 +55,7 @@ Text is supported directly. If the host supplies dictated or transcribed speech,
 At the end of the exchange, before spending time on grammar analysis:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py roleplay-stop s_...
+python <skill-root>/scripts/deutsch_loop.py roleplay-stop s_...
 ```
 
 This changes the session to `debriefing` and freezes its elapsed duration and learner turn count. It includes time spent listening, typing, reading, and waiting; call it **scene duration**, never “you spoke for”. Do not invent a duration or supply an override for a scene with recorded turns.
@@ -63,7 +63,7 @@ This changes the session to `debriefing` and freezes its elapsed duration and le
 Review the real utterances. Record confirmed root causes in turn order, once per root cause per actual learner sentence. Use the full original sentence and complete minimal correction as usual. Link every occurrence to its source so repetition counts are session-specific:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py record --session-id s_... --turn-id t_... --original 'Wir sind zwei Person.' --corrected 'Wir sind zwei Personen.' --category plural --pattern 'Person plural is Personen' --rule 'Plural: Personen'
+python <skill-root>/scripts/deutsch_loop.py record --session-id s_... --turn-id t_... --original 'Wir sind zwei Person.' --corrected 'Wir sind zwei Personen.' --category plural --pattern 'Person plural is Personen' --rule 'Plural: Personen'
 ```
 
 Use `--mistake-id` for a known pattern. Linked records use the turn timestamp automatically. Ordinary `record` calls without a session link do not contribute to the scene's report. Retries of a linked record do not double-count; a new wrong sentence in another turn does count. Do not record the same occurrence through both `grade fail` and `record`.
@@ -77,7 +77,7 @@ For a known pattern used correctly without prompting, `observe --context "..."` 
 Select at most five useful words or phrases actually encountered. Keep articles with nouns and use the learner's explanation language for meanings:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py roleplay-vocab s_... --term 'reservieren' --surface 'reserviert' --meaning 'rezervasyon yapmak' --turn-id t_...
+python <skill-root>/scripts/deutsch_loop.py roleplay-vocab s_... --term 'reservieren' --surface 'reserviert' --meaning 'rezervasyon yapmak' --turn-id t_...
 ```
 
 `--surface` is the actual inflected form in that learner or partner turn. Omit it when the dictionary form appears verbatim. The engine checks the cited form against the stored utterance; the agent judges whether the dictionary form and meaning are appropriate. Do not invent words to fill a list. The report calls these **scene vocabulary**, since it cannot know which words were new to the learner.
@@ -87,7 +87,7 @@ A new word also enters the learner's word deck and comes back in spaced reviews 
 ## Debrief and finish
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py roleplay-finish s_... --format text
+python <skill-root>/scripts/deutsch_loop.py roleplay-finish s_... --format text
 ```
 
 Put that text in the final assistant message. With default JSON output, `learner_message` contains the same report and `next_action` becomes `present_debrief`. Both formats still require the assistant to show the content. Do not treat a successful command or a “worked for …” UI indicator as visible feedback.

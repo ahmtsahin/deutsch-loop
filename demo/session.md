@@ -2,9 +2,9 @@
 
 [Back to the README](../README.md)
 
-Scripted four-month learner history, seeded through the engine; actual, unedited tutor replies from one Claude Code chat with an isolated DeutschDNA state directory. The learner's answer was scripted after reading the tutor's task.
+Scripted four-month learner history, seeded through the engine; actual tutor replies from one Claude Code chat with an isolated DeutschLoop state directory. The learner's answer was scripted after reading the tutor's task. Recorded before the project was renamed from DeutschDNA: the engine's card headings now read FehlerDNA and the skill copy is now called deutsch-loop-demo; nothing else in the replies was edited.
 
-The chat starts with `/deutsch-dna-demo`, a copy of the skill under another name, so that an installed `deutsch-dna` cannot answer in its place.
+The chat starts with `/deutsch-loop-demo`, a copy of the skill under another name, so that an installed `deutsch-loop` cannot answer in its place.
 
 Host: Claude Code · Model: claude-fable-5-1 · Captured: 2026-09-29T20:39:34+00:00
 
@@ -15,7 +15,7 @@ Host: Claude Code · Model: claude-fable-5-1 · Captured: 2026-09-29T20:39:34+00
 ### Learner
 
 ```text
-/deutsch-dna-demo
+/deutsch-loop-demo
 ```
 
 ### Tutor
@@ -23,7 +23,7 @@ Host: Claude Code · Model: claude-fable-5-1 · Captured: 2026-09-29T20:39:34+00
 > Hallo Alex!
 >
 > ```text
-> DeutschDNA · Alex · B2 · 17 Tage in Folge · 2 von 14 gemeistert
+> FehlerDNA · Alex · B2 · 17 Tage in Folge · 2 von 14 gemeistert
 >
 > Adjektiv nach ein/kein/mein  ▱▱▱▱▱▱ 0/6   5× falsch ↺   jetzt fällig
 > anrufen + Akkusativ          ▰▰▱▱▱▱ 2/6   2× falsch     jetzt fällig
@@ -60,7 +60,7 @@ Ich habe einen großen Tisch und einen bequemen Sessel gekauft.
 > ## Wochenbilanz
 >
 > ```text
-> DeutschDNA · Alex · B2
+> FehlerDNA · Alex · B2
 > 14 Muster · 2 gemeistert · 29× falsch · 72× richtig · 17 Tage in Folge · 2 fällig
 >
 > Artikel         ████████░░  78%   1 Muster  · 1 gemeistert · 1× falsch · 6× richtig

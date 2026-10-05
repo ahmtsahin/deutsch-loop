@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Put DeutschDNA's first session through a real agent host.
+"""Put DeutschLoop's first session through a real agent host.
 
 A simulated learner, played by a small Claude model with a fixed script, talks to Claude Code or
 Codex. The host uses a copy of this working tree as a skill. Afterwards the script reads the saved
@@ -8,7 +8,7 @@ whether a hint comes before the answer, and whether the self-repair and the new 
 saved.
 
 This makes real model calls on your accounts and takes a few minutes per run. It never uses
-~/.deutschdna: the host gets its own state directory, and the run fails if the real one changes.
+~/.deutschloop: the host gets its own state directory, and the run fails if the real one changes.
 
     python evals/first_session.py --host claude
     python evals/first_session.py --host codex --model gpt-6-astra --setup none
@@ -34,15 +34,15 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import deutsch_dna as dna  # noqa: E402
+import deutsch_loop as dna  # noqa: E402
 
-SKILL_NAME = "deutsch-dna-smoke"
+SKILL_NAME = "deutsch-loop-smoke"
 TURN_TIMEOUT = 900
 LEARNER_TIMEOUT = 300
 
 # The one-time rules from the README that let the helper run without a prompt in every project.
 CLAUDE_ALLOW_RULES = [
-    f"{tool}({program} *deutsch_dna.py*)"
+    f"{tool}({program} *deutsch_loop.py*)"
     for tool in ("Bash", "PowerShell")
     for program in ("python", "python3", "py")
 ] + [f"Read(~/.claude/skills/{SKILL_NAME}/**)"]
@@ -61,7 +61,7 @@ Return only a JSON object: {"message": "<what you type>", "kind": "setup" | "ger
 Use "german" only for your first German sentence, "repair" for the fixed version of it, and "transfer" for the new sentence in rule 5."""
 
 INTERNAL_TERMS = re.compile(
-    r"deutsch_dna|\bpython\b|\.json\b|\bJSON\b|--[a-z]|\bm_[0-9a-f]{6,}\b|\bmistake[_-]id\b|\brecap\b|\bonboarding\b|"
+    r"deutsch_loop|\bpython\b|\.json\b|\bJSON\b|--[a-z]|\bm_[0-9a-f]{6,}\b|\bmistake[_-]id\b|\brecap\b|\bonboarding\b|"
     r"\bstate director|\bshell\b|\bquoting\b|\bparser\b|\bCLI\b|\bsandbox\b",
     re.IGNORECASE,
 )
@@ -87,7 +87,7 @@ class ToolCall:
 
     @property
     def is_cli(self) -> bool:
-        return self.kind == "shell" and "deutsch_dna.py" in self.text
+        return self.kind == "shell" and "deutsch_loop.py" in self.text
 
 
 @dataclass
@@ -167,7 +167,7 @@ def run_process(command: list[str], *, stdin: str, cwd: Path, env: dict[str, str
 
 
 def install_skill(source: Path, target: Path) -> None:
-    """Copy the skill under a separate name, so an installed deutsch-dna cannot shadow it."""
+    """Copy the skill under a separate name, so an installed deutsch-loop cannot shadow it."""
     if target.exists():
         raise SystemExit(f"{target} already exists; remove it or pick another --install location")
     target.mkdir(parents=True)
@@ -175,7 +175,7 @@ def install_skill(source: Path, target: Path) -> None:
     shutil.copytree(source / "agents", target / "agents")
     shutil.copytree(source / "docs", target / "docs")
     (target / "scripts").mkdir()
-    for name in ("deutsch_dna.py", "scenario_catalog.py", "dashboard.html"):
+    for name in ("deutsch_loop.py", "scenario_catalog.py", "dashboard.html"):
         shutil.copy2(source / "scripts" / name, target / "scripts" / name)
     skill = re.sub(r"^name: .*$", f"name: {SKILL_NAME}", (source / "SKILL.md").read_text(encoding="utf-8"), count=1, flags=re.M)
     (target / "SKILL.md").write_bytes(skill.encode("utf-8"))
@@ -194,8 +194,8 @@ def codex_command() -> list[str]:
 def default_codex_prompt(skill_dir: Path) -> str:
     text = (skill_dir / "agents" / "openai.yaml").read_text(encoding="utf-8")
     match = re.search(r'default_prompt:\s*"(.*)"', text)
-    prompt = match.group(1) if match else "Use $deutsch-dna to help me start practising German."
-    return prompt.replace("$deutsch-dna", f"${SKILL_NAME}")
+    prompt = match.group(1) if match else "Use $deutsch-loop to help me start practising German."
+    return prompt.replace("$deutsch-loop", f"${SKILL_NAME}")
 
 
 # --------------------------------------------------------------------------- hosts
@@ -310,7 +310,7 @@ class CodexHost:
                 elif item.get("type") == "command_execution":
                     command, output = item.get("command", ""), item.get("aggregated_output") or ""
                     ok = item.get("exit_code") == 0
-                    denied = SANDBOX_DENIAL.search(output) or ("deutsch_dna.py" in command and STATE_DENIAL.search(output))
+                    denied = SANDBOX_DENIAL.search(output) or ("deutsch_loop.py" in command and STATE_DENIAL.search(output))
                     calls.append(ToolCall("shell", command, ok, output[:2000], denied=not ok and bool(denied)))
             elif kind in ("turn.failed", "error"):
                 error = json.dumps(event, ensure_ascii=False)[:500]
@@ -389,7 +389,7 @@ def evaluate(run: Run, state: Path, real_before: dict[str, str], real_after: dic
     blocked = [call for call in calls if call.denied]
     failed = [call for call in cli if call.ok is False and not call.denied]
     checks = [
-        Check("real state untouched", real_before == real_after, "~/.deutschdna unchanged" if real_before == real_after else "~/.deutschdna CHANGED during the run"),
+        Check("real state untouched", real_before == real_after, "~/.deutschloop unchanged" if real_before == real_after else "~/.deutschloop CHANGED during the run"),
         Check("state saved", bool(profile), f"{len(cli)} helper calls, profile {'written' if profile else 'missing'}"),
         Check("no blocked calls", not blocked, f"{len(blocked)} blocked: " + "; ".join(call.text[:120] for call in blocked[:3]) if blocked else "none"),
         Check("no failed helper calls", not failed, "; ".join(f"{call.text[:100]} → {call.output[:160]}" for call in failed[:3]) or "none", hard=False),
@@ -473,19 +473,19 @@ def write_transcript(path: Path, run: Run, checks: list[Check], title: str = "Fi
 def one_run(arguments: argparse.Namespace, host_name: str, number: int, out: Path) -> tuple[bool, list[Check]]:
     token = uuid.uuid4().hex[:8]
     # Not mkdtemp: on Windows it limits the folder to the current user, and the Codex sandbox could not read it.
-    work = Path(tempfile.gettempdir()) / f"deutschdna-{host_name}-{token}"
+    work = Path(tempfile.gettempdir()) / f"deutschloop-{host_name}-{token}"
     project, learner_dir, logs = work / "project", work / "learner", out / f"{host_name}-{number}"
     for directory in (project, learner_dir, logs):
         directory.mkdir(parents=True, exist_ok=True)
     # Where a real installation keeps its state: in the home directory, outside the project and temp folders.
-    state = Path.home() / f".deutschdna-smoke-{token}"
+    state = Path.home() / f".deutschloop-smoke-{token}"
     personal = {"claude": Path.home() / ".claude" / "skills", "codex": Path.home() / ".codex" / "skills"}[host_name]
     skills = personal if arguments.install == "personal" else project / (".claude" if host_name == "claude" else ".agents") / "skills"
     skill_dir = skills / SKILL_NAME
-    real_home = Path.home() / ".deutschdna"
+    real_home = dna.standard_home()
     real_before = fingerprint(real_home)
-    env = {**os.environ, "DEUTSCHDNA_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
-    env.pop("DEUTSCHDNA_UTC_OFFSET", None)
+    env = {**os.environ, "DEUTSCHLOOP_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
+    env.pop("DEUTSCHLOOP_UTC_OFFSET", None)
     log = lambda text: print(text, flush=True)  # noqa: E731
     run = Run(host=host_name, setup=arguments.setup)
     checks: list[Check] = []
@@ -546,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="Check DeutschDNA's first session in a real agent host")
+    parser = argparse.ArgumentParser(description="Check DeutschLoop's first session in a real agent host")
     parser.add_argument("--host", choices=["claude", "codex", "both"], default="claude")
     parser.add_argument("--setup", choices=["done", "none"], default="done",
                         help="done: the one-time permission setup from the README; none: a fresh install where nobody approves prompts")
@@ -561,7 +561,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, help="where transcripts and reports go (default: a temporary folder)")
     parser.add_argument("--keep", action="store_true", help="keep the project and state folders for inspection")
     arguments = parser.parse_args(argv)
-    out = arguments.out or Path(tempfile.gettempdir()) / "deutschdna-first-session" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    out = arguments.out or Path(tempfile.gettempdir()) / "deutschloop-first-session" / datetime.now().strftime("%Y%m%d-%H%M%S")
     out.mkdir(parents=True, exist_ok=True)
     hosts = ["claude", "codex"] if arguments.host == "both" else [arguments.host]
     results = []

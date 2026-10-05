@@ -8,9 +8,9 @@ Run these examples from the cloned skill folder.
 The agent drives the CLI; you can use it directly too. Every command prints JSON, compact when an agent reads it and indented in your terminal; `show` returns a pattern's full history. `recap`, `summary`, `due`, `show`, `vocab-due`, and `vocab-list` also take `--format text` for German cards, and `list --format text` prints a table of the pattern keys.
 
 ```bash
-python scripts/deutsch_dna.py init --name "Alex" --level B2 --native-language tr
-python scripts/deutsch_dna.py record --original "Ich spreche mit mein Chef." --corrected "Ich spreche mit meinem Chef." --category case --pattern "mit + dative" --rule "mit always governs the dative"
-python scripts/deutsch_dna.py summary --format text
+python scripts/deutsch_loop.py init --name "Alex" --level B2 --native-language tr
+python scripts/deutsch_loop.py record --original "Ich spreche mit mein Chef." --corrected "Ich spreche mit meinem Chef." --category case --pattern "mit + dative" --rule "mit always governs the dative"
+python scripts/deutsch_loop.py summary --format text
 ```
 
 | Command | What it does |
@@ -20,7 +20,7 @@ python scripts/deutsch_dna.py summary --format text
 | `observe` | Count a correct, unprompted use of a tracked pattern |
 | `coach` | Remember an actual practice attempt and the hint used, without changing the review schedule |
 | `due`, `grade` | Spaced-repetition reviews |
-| `summary` | The DeutschDNA profile with root causes |
+| `summary` | The FehlerDNA profile with root causes |
 | `dashboard` | Export a portable offline HTML view of your patterns, hints, milestones, and saved timelines |
 | `show` | The journey of one pattern |
 | `list`, `undo`, `forget`, `merge`, `rename` | Inspect and repair the memory; `undo` also reverts a merge |
@@ -35,12 +35,12 @@ python scripts/deutsch_dna.py summary --format text
 | `vocab-due`, `vocab-grade` | Spaced reviews of the words from your scenes |
 | `vocab-list`, `vocab-undo`, `vocab-forget` | Your word deck, and repairs to it |
 
-State lives in `~/.deutschdna`; set `DEUTSCHDNA_HOME` or pass `--home` before the command to use another directory. Each command locks that directory, so an agent can run several commands in parallel without losing a write. The full contract, including idempotency and scoring, is in [references/cli-contract.md](../references/cli-contract.md).
+State lives in `~/.deutschloop`; set `DEUTSCHLOOP_HOME` or pass `--home` before the command to use another directory. Each command locks that directory, so an agent can run several commands in parallel without losing a write. The full contract, including idempotency and scoring, is in [references/cli-contract.md](../references/cli-contract.md).
 
 Export a [visual learning story](dashboard.md), then open the file in your browser:
 
 ```bash
-python scripts/deutsch_dna.py dashboard --output my-progress.html
+python scripts/deutsch_loop.py dashboard --output my-progress.html
 ```
 
 The export leaves learning records unchanged and works without a server or network connection. Use `--force` to replace an existing HTML export. A missing learner directory produces an empty view without creating memory.
@@ -48,7 +48,7 @@ The export leaves learning records unchanged and works without a server or netwo
 Reviews require the actual new task and learner answer:
 
 ```bash
-python scripts/deutsch_dna.py grade m_... --result pass --prompt "Dein Verkehrsmittel ist der Bus. Wie kommst du zur Arbeit?" --answer "Ich fahre mit dem Bus."
+python scripts/deutsch_loop.py grade m_... --result pass --prompt "Dein Verkehrsmittel ist der Bus. Wie kommst du zur Arbeit?" --answer "Ich fahre mit dem Bus."
 ```
 
 The engine rejects early reviews, reused prompts, copied answers, and passes with hints. Before the due time, use `coach` for practice. Save a learner-stated goal with `init --goal "Morgen möchte ich einen Termin mit meinem Chef klären."`; roleplay combines a relevant goal with a due or active pattern. See [the learning loop](../references/learning-loop.md) for the complete conversation flow.
@@ -56,8 +56,8 @@ The engine rejects early reviews, reused prompts, copied answers, and passes wit
 For a goal across several scenes, use [missions](missions.md):
 
 ```bash
-python scripts/deutsch_dna.py mission-create --goal "Cuma Almanca iş görüşmem var." --scenario interview --deadline cuma
-python scripts/deutsch_dna.py mission-start g_...
+python scripts/deutsch_loop.py mission-create --goal "Cuma Almanca iş görüşmem var." --scenario interview --deadline cuma
+python scripts/deutsch_loop.py mission-start g_...
 ```
 
 The engine selects active mistakes from the previous scene before other due patterns and returns actual previous answers and notes for adaptation. Mark real partner help in `roleplay-turn --support hint/shown`; a mission result of `achieved` requires no help and source learner turns. Mission progress is separate from grammar mastery.

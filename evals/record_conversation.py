@@ -20,21 +20,21 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from first_session import ClaudeHost, TutorTurn, fingerprint, parse_jsonl  # noqa: E402
+from first_session import ClaudeHost, TutorTurn, dna, fingerprint, parse_jsonl  # noqa: E402
 
 
 MESSAGES = (
-    (1, "Use /deutsch-dna-demo. Please explain in English and keep replies brief. "
+    (1, "Use /deutsch-loop-demo. Please explain in English and keep replies brief. "
         "I'd like to practise my German: Ich spreche mit mein Chef."),
     (1, "Ich spreche mit meinem Chef."),
-    (2, "Use /deutsch-dna-demo. Please explain in English and keep replies brief. "
+    (2, "Use /deutsch-loop-demo. Please explain in English and keep replies brief. "
         "Heute habe ich mit unseren Kunden gesprochen. "
         "How does that compare with what I practised earlier?"),
 )
 
 
 def write_transcript(path: Path, recording: dict) -> None:
-    lines = ["# An actual DeutschDNA conversation", "", "[Back to the README](../README.md)", "",
+    lines = ["# An actual DeutschLoop conversation", "", "[Back to the README](../README.md)", "",
              recording["disclosure"], "",
              "The tutor replies below are reproduced in full. The GIF uses checked excerpts with "
              "emphasis formatting removed and waiting time compressed. It is a transcript replay.", "",
@@ -71,7 +71,7 @@ def main() -> int:
     if not work.is_relative_to((ROOT / "demo-home").resolve()):
         parser.error("the recording folder must be inside this repository's demo-home/")
     project, state, logs = work / "project", work / "state", work / "logs"
-    skill = project / ".claude" / "skills" / "deutsch-dna-demo"
+    skill = project / ".claude" / "skills" / "deutsch-loop-demo"
     for directory in (skill, state, logs):
         directory.mkdir(parents=True, exist_ok=True)
     for directory in ("scripts", "references", "agents"):
@@ -80,14 +80,14 @@ def main() -> int:
                             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     (skill / "SKILL.md").write_text(
-        instructions.replace("name: deutsch-dna\n", "name: deutsch-dna-demo\n", 1), encoding="utf-8")
+        instructions.replace("name: deutsch-loop\n", "name: deutsch-loop-demo\n", 1), encoding="utf-8")
     settings = work / "settings.json"
     settings.write_text(json.dumps({"permissions": {"allow": [
-        f"{tool}({program} *deutsch_dna.py*)"
+        f"{tool}({program} *deutsch_loop.py*)"
         for tool in ("Bash", "PowerShell") for program in ("python", "python3", "py")
     ]}}), encoding="utf-8")
-    env = {**os.environ, "DEUTSCHDNA_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
-    real_home = Path.home() / ".deutschdna"
+    env = {**os.environ, "DEUTSCHLOOP_HOME": str(state), "PYTHONIOENCODING": "utf-8"}
+    real_home = dna.standard_home()
     before = fingerprint(real_home)
     exchanges, models = [], set()
     host, current_session = None, None
@@ -146,7 +146,7 @@ def main() -> int:
         "host": "Claude Code", "models": sorted(models),
         "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "disclosure": "Scripted learner messages; actual, unedited tutor replies from two separate "
-                      "Claude Code chats sharing an isolated DeutschDNA state directory. "
+                      "Claude Code chats sharing an isolated DeutschLoop state directory. "
                       "Both chats were recorded on the same day. No simulated time jump.",
         "exchanges": exchanges,
         "evidence": {key: pattern.get(key) for key in

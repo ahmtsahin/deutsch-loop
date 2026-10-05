@@ -9,8 +9,8 @@ The learner practises German; the coach remembers the support used and the obser
 3. Once they answer, record the original error once, then what actually happened in the attempt. Run `record` before `coach`: an error saved after the assisted attempt looks like a recurrence after the help and blocks the next day's evidence.
 
    ```text
-   python <skill-root>/scripts/deutsch_dna.py record --original 'Ich spreche mit mein Chef.' --corrected 'Ich spreche mit meinem Chef.' --category case --pattern 'mit + dative' --rule 'mit verlangt den Dativ'
-   python <skill-root>/scripts/deutsch_dna.py coach <mistake-id> --outcome assisted --prompt 'Schau noch einmal auf mit mein Chef.' --answer 'Ich spreche mit meinem Chef.' --strategy 'Kasusfrage' --hint 'Frage dich: mit wem?'
+   python <skill-root>/scripts/deutsch_loop.py record --original 'Ich spreche mit mein Chef.' --corrected 'Ich spreche mit meinem Chef.' --category case --pattern 'mit + dative' --rule 'mit verlangt den Dativ'
+   python <skill-root>/scripts/deutsch_loop.py coach <mistake-id> --outcome assisted --prompt 'Schau noch einmal auf mit mein Chef.' --answer 'Ich spreche mit meinem Chef.' --strategy 'Kasusfrage' --hint 'Frage dich: mit wem?'
    ```
 
 4. Give one different situation that requires the same structure, without the rule or answer. Wait for their production, then use `coach --outcome independent --prompt '...' --answer '...'` if correct without help. This same-session win keeps the review schedule and accuracy unchanged. It is not evidence of long-term retention.

@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from test_agent_contract import CliTestCase
-from test_deutsch_dna import BASE_TIME, ROOT, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, ROOT, StoreTestCase, dna
 
 
 class MissionTests(StoreTestCase):
@@ -56,19 +56,19 @@ class MissionTests(StoreTestCase):
         self.assertEqual(len(self.store.mission_list()), 1)
 
     def test_relative_dates_follow_the_local_calendar_and_weekday_language(self):
-        with mock.patch.dict(os.environ, {"DEUTSCHDNA_UTC_OFFSET": "+02:00"}):
+        with mock.patch.dict(os.environ, {"DEUTSCHLOOP_UTC_OFFSET": "+02:00"}):
             near_midnight = dna.parse_moment("2026-10-01T23:30:00Z")
             for word in ("cuma", "Freitag", "friday", "today", "bugün", "heute"):
                 self.assertEqual(dna.parse_deadline(word, near_midnight), "2026-10-02")
             self.assertEqual(dna.parse_deadline("yarın", near_midnight), "2026-10-03")
             self.assertEqual(dna.parse_deadline("pazartesi", near_midnight), "2026-10-05")
         for invalid in ("2026-02-30", "20261002", "next friday", "soon"):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 dna.parse_deadline(invalid, BASE_TIME)
 
     def test_invalid_goal_or_scenario_does_not_save_a_mission(self):
         for overrides in ({"goal": " "}, {"scenario": "missing"}, {"deadline": "2026-02-30"}):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.mission(**overrides)
         self.assertFalse(self.store.missions_path.exists())
 
@@ -87,13 +87,13 @@ class MissionTests(StoreTestCase):
         self.assertIn("not a proficiency", view["completion_basis"])
         self.assertEqual(self.store.mistakes_path.read_bytes(), before)
         self.assertEqual(self.store.show(mistake["id"])["review_step"], 0)
-        with self.assertRaisesRegex(dna.DeutschDNAError, "not active"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "not active"):
             self.store.mission_start(identifier, at=BASE_TIME + timedelta(days=3))
 
     def test_hint_is_detected_from_partner_turns_even_if_assessment_claims_no_help(self):
         identifier = self.mission()
         scene, turn = self.attempt(identifier, support="hint")
-        with self.assertRaisesRegex(dna.DeutschDNAError, "supported scene"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "supported scene"):
             self.assess(identifier, scene, turn)
         result = self.assess(identifier, scene, turn, result="practice")
         self.assertEqual(result["mission"]["completed_steps"], 0)
@@ -145,15 +145,15 @@ class MissionTests(StoreTestCase):
         identifier = self.mission()
         scene, turn = self.attempt(identifier)
         args = dict(session_id=scene["session"]["id"], result="achieved", support="none", evidence_turn_ids=[turn["id"]], note="Concrete answer.", at=BASE_TIME + timedelta(minutes=5))
-        with self.assertRaisesRegex(dna.DeutschDNAError, "completed scene"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "completed scene"):
             self.store.mission_assess(identifier, **args)
         self.store.roleplay_finish(scene["session"]["id"], at=BASE_TIME + timedelta(minutes=4))
         partner = self.store.roleplay_show(scene["session"]["id"])["session"]["utterances"][0]["id"]
         for ids in ([], ["invented"], [partner]):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.store.mission_assess(identifier, **{**args, "evidence_turn_ids": ids})
         another = self.mission(goal="Prepare for a presentation.", scenario="presentation")
-        with self.assertRaisesRegex(dna.DeutschDNAError, "belonging"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "belonging"):
             self.store.mission_assess(another, **args)
         self.assertEqual(self.store.mission_show(identifier)["completed_steps"], 0)
 
@@ -164,7 +164,7 @@ class MissionTests(StoreTestCase):
         retry = self.assess(identifier, scene, turn)
         self.assertEqual(retry["status"], "duplicate")
         self.assertEqual(retry["mission"]["completed_steps"], 1)
-        with self.assertRaisesRegex(dna.DeutschDNAError, "already assessed differently"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "already assessed differently"):
             self.assess(identifier, scene, turn, result="practice")
         undone = self.store.mission_undo(identifier, at=BASE_TIME + timedelta(minutes=6))
         self.assertEqual(undone["mission"]["completed_steps"], 0)
@@ -175,7 +175,7 @@ class MissionTests(StoreTestCase):
         scene, turn = self.attempt(identifier)
         self.assess(identifier, scene, turn)
         self.store.mission_start(identifier, at=BASE_TIME + timedelta(days=1))
-        with self.assertRaisesRegex(dna.DeutschDNAError, "newer pending"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "newer pending"):
             self.store.mission_undo(identifier, at=BASE_TIME + timedelta(days=1, minutes=1))
 
     def test_new_goal_and_deadline_can_be_saved_and_expiry_does_not_fake_completion(self):
@@ -194,11 +194,11 @@ class MissionTests(StoreTestCase):
 
     def test_backdated_start_or_assessment_is_rejected(self):
         identifier = self.mission()
-        with self.assertRaisesRegex(dna.DeutschDNAError, "precede"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "precede"):
             self.store.mission_start(identifier, at=BASE_TIME - timedelta(days=1))
         scene, turn = self.attempt(identifier)
         self.store.roleplay_finish(scene["session"]["id"], at=BASE_TIME + timedelta(minutes=4))
-        with self.assertRaisesRegex(dna.DeutschDNAError, "precede"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "precede"):
             self.store.mission_assess(identifier, session_id=scene["session"]["id"], result="achieved", support="none",
                                      evidence_turn_ids=[turn["id"]], note="An actual answer.", at=BASE_TIME)
 
@@ -247,10 +247,10 @@ class MissionCliTests(CliTestCase):
         from first_session import install_skill
         target = self.home / "installed"
         install_skill(ROOT, target)
-        result = subprocess.run([sys.executable, str(target / "scripts" / "deutsch_dna.py"), "--home", str(self.home / "memory"), "scenarios"], capture_output=True, encoding="utf-8")
+        result = subprocess.run([sys.executable, str(target / "scripts" / "deutsch_loop.py"), "--home", str(self.home / "memory"), "scenarios"], capture_output=True, encoding="utf-8")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)["count"], 15)
-        exported = subprocess.run([sys.executable, str(target / "scripts" / "deutsch_dna.py"), "--home", str(self.home / "memory"), "dashboard", "--output", str(self.home / "copied.html")], capture_output=True, encoding="utf-8")
+        exported = subprocess.run([sys.executable, str(target / "scripts" / "deutsch_loop.py"), "--home", str(self.home / "memory"), "dashboard", "--output", str(self.home / "copied.html")], capture_output=True, encoding="utf-8")
         self.assertEqual(exported.returncode, 0, exported.stderr)
         self.assertTrue((target / "docs" / "dashboard.md").is_file())
 

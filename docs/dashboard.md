@@ -9,10 +9,10 @@ The dashboard turns your saved sentences into a story you can explore. It is one
 From the cloned skill folder:
 
 ```bash
-python scripts/deutsch_dna.py dashboard --output my-progress.html
+python scripts/deutsch_loop.py dashboard --output my-progress.html
 ```
 
-The JSON response gives the absolute path to open. In a tutor conversation, ask for a visual progress view and the agent can export it for you. The dashboard uses the same `--home` or `DEUTSCHDNA_HOME` as the tutor.
+The JSON response gives the absolute path to open. In a tutor conversation, ask for a visual progress view and the agent can export it for you. The dashboard uses the same `--home` or `DEUTSCHLOOP_HOME` as the tutor.
 
 Choose a pattern to see:
 
@@ -28,7 +28,7 @@ Saved real-life missions appear above the pattern map, with their date, current 
 This is a snapshot, so due dates are evaluated at export time. The displayed dates retain the engine's local offset even when the file is opened in a browser with another time zone. Export again for a fresh view. To replace an existing HTML file deliberately:
 
 ```bash
-python scripts/deutsch_dna.py dashboard --output my-progress.html --force
+python scripts/deutsch_loop.py dashboard --output my-progress.html --force
 ```
 
 The output must end in `.html` or `.htm`. The command does not grade, reschedule, mark a profile as shown, initialize a missing learner directory, or persist state migrations. An existing state directory is locked for a consistent snapshot. An empty history has an explicit starting message and no fabricated scores.

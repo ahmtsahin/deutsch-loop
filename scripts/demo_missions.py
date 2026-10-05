@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import deutsch_dna as dna
+import deutsch_loop as dna
 
 
 START = datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc)
@@ -18,7 +18,7 @@ START = datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc)
 
 def mission_demo_payload(home: Path) -> dict[str, Any]:
     if home.exists() and any(home.iterdir()):
-        raise dna.DeutschDNAError("The mission demo requires an empty, isolated state directory")
+        raise dna.DeutschLoopError("The mission demo requires an empty, isolated state directory")
     store = dna.StateStore(home)
     store.init_profile(name="Alex", level="B1", explanation_language="en", at=START - timedelta(days=1))
     mit, _, _ = store.record(original="Ich spreche mit mein Chef.", corrected="Ich spreche mit meinem Chef.",
@@ -97,12 +97,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true")
     arguments = parser.parse_args(argv)
     try:
-        with tempfile.TemporaryDirectory(prefix="deutschdna-mission-demo-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="deutschloop-mission-demo-") as temporary:
             payload = mission_demo_payload(Path(temporary))
             result = dna.write_dashboard(payload, arguments.output, force=arguments.force)
         dna._print_json(result)
         return 0
-    except dna.DeutschDNAError as exc:
+    except dna.DeutschLoopError as exc:
         dna._print_json({"error": str(exc)}, stream=sys.stderr)
         return 2
 

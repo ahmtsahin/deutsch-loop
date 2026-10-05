@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md)
 
-Run the commands below from the repository root. DeutschDNA's runtime uses only Python 3.10+ and the standard library. Pillow is a contributor dependency for rendering the README assets.
+Run the commands below from the repository root. DeutschLoop's runtime uses only Python 3.10+ and the standard library. Pillow is a contributor dependency for rendering the README assets.
 
 ## Unit tests
 
@@ -17,7 +17,7 @@ python evals/first_session.py --host claude
 python evals/first_session.py --host codex --model gpt-6-astra
 ```
 
-It uses a copy of the skill called `deutsch-dna-smoke` and isolated state, and fails if `~/.deutschdna` changes. These runs make real model calls through the installed hosts and take a few minutes. `--setup none` checks the experience before permission setup; `--runs 3` repeats the session.
+It uses a copy of the skill called `deutsch-loop-smoke` and isolated state, and fails if `~/.deutschloop` changes. These runs make real model calls through the installed hosts and take a few minutes. `--setup none` checks the experience before permission setup; `--runs 3` repeats the session.
 
 The interrupted-lesson check ends a chat right after the tutor's hint, before the learner answers, and continues in a fresh chat on the same state. There the learner sends the repaired sentence as if resuming, then makes the same mistake in a new sentence and repairs it. The run fails if the unanswered hint saved anything, if the resumed answer counted for anything, if the new mistake was not saved exactly once, or if a sentence given after a hint was saved as unaided. The learner's messages are scripted, so no second model is involved:
 
@@ -65,7 +65,7 @@ The first full scene is saved as the static alternative. Source images are 720 Ã
 The terminal version of the four-month story can also be rendered with [VHS](https://github.com/charmbracelet/vhs):
 
 ```bash
-vhs demo/deutschdna.tape
+vhs demo/history.tape
 ```
 
 It writes `demo/history-terminal.gif`, leaving the README's compact story intact.
@@ -80,7 +80,7 @@ To capture another run with your existing Claude Code login:
 python evals/record_conversation.py --output demo-home/new-conversation.json
 ```
 
-This makes three real host calls. It creates a project-local skill copy and an isolated progress folder under the ignored `demo-home/` directory. Global settings and the real learner memory are not edited; the script checks that `~/.deutschdna` stays unchanged. Raw host logs stay local, while the export contains the tutor's complete words and selected evidence. Existing output files are never overwritten.
+This makes three real host calls. It creates a project-local skill copy and an isolated progress folder under the ignored `demo-home/` directory. Global settings and the real learner memory are not edited; the script checks that `~/.deutschloop` stays unchanged. Raw host logs stay local, while the export contains the tutor's complete words and selected evidence. Existing output files are never overwritten.
 
 If interrupted, reuse the printed recording folder:
 
@@ -122,14 +122,14 @@ python scripts/render_demo_gif.py --story session --transcript demo-home/new-ses
 claude plugin validate .
 ```
 
-Claude Code loads the root `SKILL.md` as the plugin's only skill. Codex loads a plugin's skills only from a subfolder, so `.codex-plugin/skills/deutsch-dna/SKILL.md` is a short entry file that sends the agent to the root `SKILL.md`. Its name and description must match the root file. It stays in a hidden folder: Codex skips hidden folders when it scans a skills folder, so a cloned skill folder still shows one skill.
+Claude Code loads the root `SKILL.md` as the plugin's only skill. Codex loads a plugin's skills only from a subfolder, so `.codex-plugin/skills/deutsch-loop/SKILL.md` is a short entry file that sends the agent to the root `SKILL.md`. Its name and description must match the root file. It stays in a hidden folder: Codex skips hidden folders when it scans a skills folder, so a cloned skill folder still shows one skill.
 
 Codex has no validate command. To see what it loads, set `CODEX_HOME` to an empty folder, so that your own Codex setup stays untouched, and run these from the repository. No model is called:
 
 ```bash
 codex plugin marketplace add .
-codex plugin add deutsch-dna@deutsch-dna
+codex plugin add deutsch-loop@deutsch-loop
 codex debug prompt-input hi
 ```
 
-The printed skills list must name `deutsch-dna:deutsch-dna` once, with a file path that ends in `.codex-plugin/skills/deutsch-dna/SKILL.md`.
+The printed skills list must name `deutsch-loop:deutsch-loop` once, with a file path that ends in `.codex-plugin/skills/deutsch-loop/SKILL.md`.

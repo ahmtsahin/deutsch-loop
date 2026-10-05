@@ -22,7 +22,7 @@ except ModuleNotFoundError as exc:
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import demo  # noqa: E402
-import deutsch_dna as dna  # noqa: E402
+import deutsch_loop as dna  # noqa: E402
 
 WIDTH, HEIGHT = 720, 800
 QUOTE_SIZE = 42  # 18 CSS px when GitHub displays this image at 309 px wide.
@@ -52,7 +52,7 @@ def row(label: str, text: str, color: str = "text", *highlight: str) -> dict:
 
 
 def collect_learning_screens() -> list[dict]:
-    with tempfile.TemporaryDirectory(prefix="deutschdna-learning-gif-") as directory:
+    with tempfile.TemporaryDirectory(prefix="deutschloop-learning-gif-") as directory:
         demo.seed_learning_loop(Path(directory))
         mistake = dna.StateStore(Path(directory)).show(dna.mistake_id("case", "mit + dative"))
     proof = dna.learning_proof_view(mistake["learning_proof"])
@@ -77,7 +77,7 @@ def collect_learning_screens() -> list[dict]:
 
 
 def collect_history_screens() -> list[dict]:
-    with tempfile.TemporaryDirectory(prefix="deutschdna-history-gif-") as directory:
+    with tempfile.TemporaryDirectory(prefix="deutschloop-history-gif-") as directory:
         demo.seed(Path(directory))
         mistake = dna.StateStore(Path(directory)).show(dna.mistake_id("preposition", "warten auf + accusative"))
     wrong = sorted(mistake["examples"], key=lambda item: dna.parse_moment(item["seen_at"]))
@@ -98,7 +98,7 @@ def collect_history_screens() -> list[dict]:
 
 def collect_board() -> tuple[str, str]:
     """The session board of the four-month demo learner, exactly as `recap --format card` prints it."""
-    with tempfile.TemporaryDirectory(prefix="deutschdna-board-") as directory:
+    with tempfile.TemporaryDirectory(prefix="deutschloop-board-") as directory:
         demo.seed(Path(directory))
         recap = dna.StateStore(Path(directory)).recap()
     return recap["profile"]["name"], dna.render_recap_card(recap)
@@ -117,8 +117,8 @@ def draw_comeback(draw: ImageDraw.ImageDraw, x: float, y: int, cell: float, colo
 
 def draw_header(draw: ImageDraw.ImageDraw, width: int, stage: str, heading: str,
                 label: ImageFont.FreeTypeFont, title: ImageFont.FreeTypeFont) -> None:
-    draw.text((64, 44), "DeutschDNA", font=label, fill=COLORS["accent"])
-    link = "github.com/ahmtsahin/deutsch-dna"
+    draw.text((64, 44), "DeutschLoop", font=label, fill=COLORS["accent"])
+    link = "github.com/ahmtsahin/deutsch-loop"
     draw.text((width - 64 - label.getlength(link), 44), link, font=label, fill=COLORS["muted"])
     draw.text((64, 112), stage, font=label, fill=COLORS["accent"])
     draw.text((64, 156), heading, font=title, fill=COLORS["text"])
@@ -196,7 +196,7 @@ def render_social(card: str, font_path: Path) -> Image.Image:
     lines = card.splitlines()
     image = Image.new("RGB", (width, height), COLORS["page"])
     draw = ImageDraw.Draw(image)
-    draw.text((56, 34), "DeutschDNA", font=label, fill=COLORS["accent"])
+    draw.text((56, 34), "DeutschLoop", font=label, fill=COLORS["accent"])
     hosts = "for Claude Code and Codex"
     draw.text((width - 56 - label.getlength(hosts), 34), hosts, font=label, fill=COLORS["muted"])
     draw.text((56, 78), "A German tutor that", font=title, fill=COLORS["text"])
@@ -347,7 +347,7 @@ def render_frame(screen: dict, index: int, count: int, font_path: Path, *,
     label = ImageFont.truetype(str(font_path), 28)
     image = Image.new("RGB", (WIDTH, HEIGHT), COLORS["page"])
     draw = ImageDraw.Draw(image)
-    draw.text((32, 22), "DeutschDNA", font=label, fill=COLORS["accent"])
+    draw.text((32, 22), "DeutschLoop", font=label, fill=COLORS["accent"])
     step = f"{index + 1} / {count}"
     draw.text((WIDTH - 32 - label.getlength(step), 22), step, font=label, fill=COLORS["muted"])
     for text, font, y, color in ((screen["stage"], label, 76, "accent"),
@@ -410,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.story == "learning-loop":
         screens, filename = collect_learning_screens(), "learning-loop"
     elif arguments.story == "history":
-        screens, filename = collect_history_screens(), "deutschdna"
+        screens, filename = collect_history_screens(), "history"
     else:
         screens, filename = collect_conversation_screens(arguments.transcript or ROOT / "demo" / "conversation.json"), "conversation"
     frames, durations, complete = [], [], []

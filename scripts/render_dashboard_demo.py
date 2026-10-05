@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-import deutsch_dna as dna
+import deutsch_loop as dna
 
 
 STORY_START = datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc)
@@ -19,7 +19,7 @@ STORY_START = datetime(2026, 5, 20, 9, 0, tzinfo=timezone.utc)
 def demo_payload(home: Path) -> dict[str, Any]:
     """Capture each chapter before later events exist; never reconstruct old scores."""
     if home.exists() and any(home.iterdir()):
-        raise dna.DeutschDNAError("The dashboard demo requires an empty, isolated state directory")
+        raise dna.DeutschLoopError("The dashboard demo requires an empty, isolated state directory")
     store = dna.StateStore(home)
     start = STORY_START
     store.init_profile(name="Alex", level="B2", at=start - timedelta(days=120))
@@ -106,11 +106,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="Replace an existing demo HTML file")
     arguments = parser.parse_args(argv)
     try:
-        with tempfile.TemporaryDirectory(prefix="deutschdna-dashboard-demo-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="deutschloop-dashboard-demo-") as temporary:
             result = dna.write_dashboard(demo_payload(Path(temporary)), arguments.output, force=arguments.force)
         dna._print_json(result)
         return 0
-    except dna.DeutschDNAError as exc:
+    except dna.DeutschLoopError as exc:
         dna._print_json({"error": str(exc)}, stream=sys.stderr)
         return 2
 

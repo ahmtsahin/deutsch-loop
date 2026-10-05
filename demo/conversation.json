@@ -4,11 +4,11 @@
     "claude-opus-5-5"
   ],
   "recorded_at": "2026-09-24T16:35:57+00:00",
-  "disclosure": "Scripted learner messages; actual, unedited tutor replies from two separate Claude Code chats sharing an isolated DeutschDNA state directory. Both chats were recorded on the same day. No simulated time jump.",
+  "disclosure": "Scripted learner messages; actual, unedited tutor replies from two separate Claude Code chats sharing an isolated DeutschLoop state directory. Both chats were recorded on the same day. No simulated time jump. Recorded before the project was renamed from DeutschDNA; only the skill name in the learner's messages was updated.",
   "exchanges": [
     {
       "session": 1,
-      "learner": "Use /deutsch-dna-demo. Please explain in English and keep replies brief. I'd like to practise my German: Ich spreche mit mein Chef.",
+      "learner": "Use /deutsch-loop-demo. Please explain in English and keep replies brief. I'd like to practise my German: Ich spreche mit mein Chef.",
       "tutor": "Good sentence, and I understand it. There's one small thing to fix.\n\nLook at **mit mein Chef** again. Which case does *mit* take? Try writing the sentence again.",
       "seconds": 10.5,
       "helper_calls": 2
@@ -22,7 +22,7 @@
     },
     {
       "session": 2,
-      "learner": "Use /deutsch-dna-demo. Please explain in English and keep replies brief. Heute habe ich mit unseren Kunden gesprochen. How does that compare with what I practised earlier?",
+      "learner": "Use /deutsch-loop-demo. Please explain in English and keep replies brief. Heute habe ich mit unseren Kunden gesprochen. How does that compare with what I practised earlier?",
       "tutor": "Your sentence is correct, and it shows exactly the pattern you practised: **mit + Dativ**.\n\n```text\nEarlier (18:30): „Ich spreche mit mein Chef\" → with a hint: „Ich spreche mit meinem Chef\" ✓\nNow:             „Heute habe ich mit unseren Kunden gesprochen.\" ✓ no help\n```\n\n- **Then:** you needed the hint *“Which case does mit take?”* to get *meinem*.\n- **Now:** you got it right with no hint, and in a harder form: dative **plural**. *unser-* takes **-en**, and the noun gets **-n** too (*Kunden*).\n\nI've saved this as a correct use. It came only a few minutes after the hint, though, so the real test is your review **tomorrow at 18:30**, when I'll give you a new sentence.\n\nWhat did the customers want?",
       "seconds": 14.1,
       "helper_calls": 2

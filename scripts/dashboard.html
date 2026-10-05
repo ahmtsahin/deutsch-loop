@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="color-scheme" content="dark">
-  <title>DeutschDNA · Your learning story</title>
+  <title>DeutschLoop · Your learning story</title>
   <style>
     :root {
       --bg: #111214; --surface: #191b1e; --raised: #202327; --border: #373b40;
@@ -239,9 +239,9 @@
   <a class="skip" href="#main">Skip to learning story</a>
   <div class="shell">
     <header class="topbar">
-      <a class="brand" href="#main" aria-label="DeutschDNA learning story">
+      <a class="brand" href="#main" aria-label="DeutschLoop learning story">
         <svg viewBox="0 0 30 40" fill="none" aria-hidden="true"><path d="M7 2c0 12 16 12 16 24s-16 12-16 12M23 2C23 14 7 14 7 26s16 12 16 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M9 7h12M12 13h6M9 20h12M9 27h12M12 33h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        <span>Deutsch<span>DNA</span></span>
+        <span>Deutsch<span>Loop</span></span>
       </a>
       <div class="top-actions">
         <span class="mode" id="mode-label">Your local snapshot</span>
@@ -255,8 +255,8 @@
       <p id="about-copy"></p>
       <p>A learning milestone pairs a successful answer after a hint with a new unaided sentence on a later day. A practice task, a review, and use in your own writing are labelled separately. Six passed review steps mark a pattern as mastered.</p>
       <p>This is a saved view. Opening it does not practise, grade, or reschedule anything. The timeline shows retained events; older details may have been trimmed.</p>
-      <p id="refresh-help">Make a fresh view with <code>python scripts/deutsch_dna.py dashboard --output my-progress.html</code>.</p>
-      <p><a href="https://github.com/ahmtsahin/deutsch-dna" target="_blank" rel="noopener noreferrer">Get DeutschDNA on GitHub ↗</a></p>
+      <p id="refresh-help">Make a fresh view with <code>python scripts/deutsch_loop.py dashboard --output my-progress.html</code>.</p>
+      <p><a href="https://github.com/ahmtsahin/deutsch-loop" target="_blank" rel="noopener noreferrer">Get DeutschLoop on GitHub ↗</a></p>
     </aside>
     <main id="main">
       <section class="hero" aria-labelledby="page-title">
@@ -311,14 +311,14 @@
       </div>
       <section class="empty" id="empty" hidden>
         <h2>Your story starts with one sentence.</h2>
-        <p>Write something in German to your DeutschDNA tutor. Once a pattern is saved, make a fresh view to see its story here.</p>
+        <p>Write something in German to your DeutschLoop tutor. Once a pattern is saved, make a fresh view to see its story here.</p>
       </section>
       <details class="catalog" id="scenario-catalog" hidden><summary>Roleplay situations <span class="catalog-count" id="scenario-count"></span></summary><p class="catalog-intro">Choose a situation and describe it to your tutor in the chat. These are starting frames; the conversation follows your answers.</p><div class="scenario-grid" id="scenario-grid"></div></details>
       <noscript><p>This interactive view needs JavaScript enabled. Your saved sentences are embedded in this file; nothing is sent to a server. The tutor's text profile is also available through <code>summary --format text</code>.</p></noscript>
     </main>
     <footer class="footer"><span>Evidence about your patterns. Every milestone has a sentence behind it.</span><span id="footer-note">Saved locally · works offline</span></footer>
   </div>
-  <script type="application/json" id="dna-data">__DEUTSCHDNA_DATA__</script>
+  <script type="application/json" id="dna-data">__DEUTSCHLOOP_DATA__</script>
   <script>
   (() => {
     "use strict";
@@ -615,7 +615,7 @@
       $(data.experience === "missions" ? "mission-demo-link" : "pattern-demo-link").setAttribute("aria-current", "page");
       if (data.experience === "missions") {
         $("page-title").replaceChildren(document.createTextNode("A real goal."), document.createElement("br"), el("span", "subtle", "A plan that remembers."));
-        document.title = "DeutschDNA · Real-life preparation";
+        document.title = "DeutschLoop · Real-life preparation";
         document.querySelector(".hero-copy").textContent = "A deadline. A few practice sessions. Each next step shaped by what happened in the last one.";
         $("demo-title").textContent = "Follow preparation across sessions.";
         $("about-copy").textContent = "Alex's interview and answers are scripted. Each chapter is captured from isolated mission and learning state in the real engine. Assessments are scripted teaching judgments grounded in saved learner turns; this is not a live AI conversation or a readiness assessment.";

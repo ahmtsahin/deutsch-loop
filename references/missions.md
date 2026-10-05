@@ -11,7 +11,7 @@ Keep the learner's stated goal and personal details. Do not treat a fictional ro
 Read `mission-list` before creating a plan. Reuse a relevant active mission when the learner is continuing it; use `mission-update` for a changed deadline or goal. Exact creation retries return `existing`. Start a genuinely new goal with:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py mission-create --goal 'Cuma Almanca iş görüşmem var.' --scenario bewerbung --deadline 'cuma'
+python <skill-root>/scripts/deutsch_loop.py mission-create --goal 'Cuma Almanca iş görüşmem var.' --scenario bewerbung --deadline 'cuma'
 ```
 
 The date can be `YYYY-MM-DD`, today/tomorrow, or a weekday in English, German, or Turkish. A bare weekday resolves to the next occurrence on the local calendar, including today. Prefer an explicit date when it is known from the conversation. Take the resolved date from `mission.deadline` and show it in a short planning sentence before the first question. If a relative expression is ambiguous, start without a deadline, ask briefly what date is meant, and save the answer with `mission-update --deadline`; keep useful preparation moving. An empty deadline clears it. A passed date is marked overdue, never silently completed.
@@ -19,7 +19,7 @@ The date can be `YYYY-MM-DD`, today/tomorrow, or a weekday in English, German, o
 ## Start or continue the next scene
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py mission-start g_...
+python <skill-root>/scripts/deutsch_loop.py mission-start g_...
 ```
 
 Use the returned `contract`: role, opening, personal goal, `mission_step.goal`, and `mission_step.criteria`. Adapt language to the learner's stated level; the criteria can be met over several small turns. Use their actual details when known. Do not recite the CLI, rubric, or hidden focus patterns to the learner. A simple opener might be “İş görüşmesi için önce kendini tanıtmayı çalışacağız. Düzeltmeleri sona bırakacağım.” Then deliver one German partner line and wait for their answer.
@@ -41,7 +41,7 @@ At the beginning of a new chat, `recap.missions` identifies active preparation a
 Follow the normal [roleplay flow](roleplay.md): log real turns, stay in character, defer ordinary corrections, and stop/freeze the scene before the debrief. If the partner supplies a hint or an answer, label that actual partner turn:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py roleplay-turn s_... --speaker partner --text 'Frage dich: mit wem?' --support hint
+python <skill-root>/scripts/deutsch_loop.py roleplay-turn s_... --speaker partner --text 'Frage dich: mit wem?' --support hint
 ```
 
 Use `--support shown` for a supplied answer, and omit the flag for ordinary partner dialogue. Do not label the learner's turn as the help. A normal interview question is not a hint. At the debrief, retain confirmed errors and actual successful productions through the existing `record`, `coach`, and `observe` rules. Reuse their timestamps when appropriate. These commands alone govern grammar memory and reviews; mission assessments do not.
@@ -49,7 +49,7 @@ Use `--support shown` for a supplied answer, and omit the flag for ordinary part
 After `roleplay-stop`, record the ordinary feedback and vocabulary and finish with `roleplay-finish`. Then assess the current step using `mission_step.criteria`, the actual saved exchange, and the help used:
 
 ```text
-python <skill-root>/scripts/deutsch_dna.py mission-assess g_... --session-id s_... --result achieved --support none --evidence-turn-id t_... --note 'The learner introduced a role, a relevant project, and motivation without help.'
+python <skill-root>/scripts/deutsch_loop.py mission-assess g_... --session-id s_... --result achieved --support none --evidence-turn-id t_... --note 'The learner introduced a role, a relevant project, and motivation without help.'
 ```
 
 The example is illustrative. Cite actual learner turn IDs from this scene and write a grounded note. Repeat `--evidence-turn-id` for multiple necessary productions. Never invent a response, award success for a greeting alone, or infer that every criterion was met from a single grammar-correct sentence.

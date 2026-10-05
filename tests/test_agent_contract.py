@@ -8,7 +8,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
-from test_deutsch_dna import BASE_TIME, CASE_REVIEWS, SCRIPT, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, CASE_REVIEWS, SCRIPT, StoreTestCase, dna
 
 
 class CliTestCase(StoreTestCase):
@@ -46,7 +46,7 @@ class ConcurrencyTests(StoreTestCase):
 
     def test_a_held_lock_times_out_with_a_clear_error(self):
         with dna.state_lock(self.home):
-            with self.assertRaisesRegex(dna.DeutschDNAError, "busy"):
+            with self.assertRaisesRegex(dna.DeutschLoopError, "busy"):
                 with dna.state_lock(self.home, timeout=0.1):
                     pass
         with dna.state_lock(self.home, timeout=0.1):
@@ -78,7 +78,7 @@ class MergeUndoTests(StoreTestCase):
             corrected="Ich esse bei meiner Tante.", at=BASE_TIME + timedelta(days=2),
         )
         self.assertEqual((again["id"], status, extra["resolved_by"]), (source["id"], "updated", "id"))
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.undo(target["id"])
 
 

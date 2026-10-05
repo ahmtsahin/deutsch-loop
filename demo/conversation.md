@@ -1,8 +1,8 @@
-# An actual DeutschDNA conversation
+# An actual DeutschLoop conversation
 
 [Back to the README](../README.md)
 
-Scripted learner messages; actual, unedited tutor replies from two separate Claude Code chats sharing an isolated DeutschDNA state directory. Both chats were recorded on the same day. No simulated time jump.
+Scripted learner messages; actual, unedited tutor replies from two separate Claude Code chats sharing an isolated DeutschLoop state directory. Both chats were recorded on the same day. No simulated time jump. Recorded before the project was renamed from DeutschDNA; only the skill name in the learner's messages was updated.
 
 The tutor replies below are reproduced in full. The GIF uses checked excerpts with emphasis formatting removed and waiting time compressed. It is a transcript replay.
 
@@ -15,7 +15,7 @@ Host: Claude Code · Model: claude-opus-5-5 · Captured: 2026-09-24T16:35:57+00:
 ### Scripted learner
 
 ```text
-Use /deutsch-dna-demo. Please explain in English and keep replies brief. I'd like to practise my German: Ich spreche mit mein Chef.
+Use /deutsch-loop-demo. Please explain in English and keep replies brief. I'd like to practise my German: Ich spreche mit mein Chef.
 ```
 
 ### Tutor
@@ -45,7 +45,7 @@ Now try a new situation: you go to work every day by car (*das Auto*). Write one
 ### Scripted learner
 
 ```text
-Use /deutsch-dna-demo. Please explain in English and keep replies brief. Heute habe ich mit unseren Kunden gesprochen. How does that compare with what I practised earlier?
+Use /deutsch-loop-demo. Please explain in English and keep replies brief. Heute habe ich mit unseren Kunden gesprochen. How does that compare with what I practised earlier?
 ```
 
 ### Tutor

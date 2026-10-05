@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay a four-month learner story through the real DeutschDNA engine.
+"""Replay a four-month learner story through the real DeutschLoop engine.
 
 The story only scripts what the learner wrote and how each review went. When a
 review happens is decided by the engine's own schedule, and every number in the
@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import deutsch_dna as dna  # noqa: E402
+import deutsch_loop as dna  # noqa: E402
 
 
 STORY_DAYS = 120
@@ -444,7 +444,7 @@ def seed_speaking_scene(home: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Seed and show a DeutschDNA demo profile")
+    parser = argparse.ArgumentParser(description="Seed and show a DeutschLoop demo profile")
     parser.add_argument("--home", help="State directory to seed (default: a fresh temporary directory)")
     parser.add_argument("--quiet", action="store_true", help="Only seed; print nothing but the state path")
     story = parser.add_mutually_exclusive_group()
@@ -453,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     dna._configure_streams()
 
-    home = Path(arguments.home).expanduser() if arguments.home else Path(tempfile.mkdtemp(prefix="deutschdna-demo-"))
+    home = Path(arguments.home).expanduser() if arguments.home else Path(tempfile.mkdtemp(prefix="deutschloop-demo-"))
     if any(home.glob("*.json")):
         print(f"Refusing to seed a non-empty state directory: {home}", file=sys.stderr)
         return 2
@@ -467,7 +467,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if arguments.speak:
         result = dna.StateStore(home).roleplay_show(scene_id)
-        print("DeutschDNA speaking demo: scripted dialogue, real engine evidence.")
+        print("DeutschLoop speaking demo: scripted dialogue, real engine evidence.")
         print(f"State directory: {home}")
         for turn in result["session"]["utterances"]:
             speaker = "Kellner" if turn["speaker"] == "partner" else "Alex"
@@ -476,13 +476,13 @@ def main(argv: list[str] | None = None) -> int:
         print(dna.render_roleplay_text(result))
         # The scene's words now wait in the deck for their first review tomorrow.
         print()
-        print("$ python scripts/deutsch_dna.py vocab-list --format text")
+        print("$ python scripts/deutsch_loop.py vocab-list --format text")
         dna.main(["--home", str(home), "vocab-list", "--format", "text"])
         return 0
 
     mit_id = dna.mistake_id("case", "mit + dative")
     warten_id = dna.mistake_id("preposition", "warten auf + accusative")
-    print("DeutschDNA demo: scripted learner, real engine — "
+    print("DeutschLoop demo: scripted learner, real engine — "
           + ("self-repair and next-day transfer." if arguments.learning_loop else "four months of learning."))
     print(f"State directory: {home}")
     screens = (
@@ -496,7 +496,7 @@ def main(argv: list[str] | None = None) -> int:
         screens = (["recap", "--format", "card"], ["show", mit_id, "--format", "text"])
     for command in screens:
         print()
-        print(f"$ python scripts/deutsch_dna.py {' '.join(command)}")
+        print(f"$ python scripts/deutsch_loop.py {' '.join(command)}")
         dna.main(["--home", str(home), *command])
     return 0
 

@@ -25,10 +25,10 @@ Every roleplay frame supports a three-step goal plan. The interview has its spec
 These commands are usually run by the agent. From a clone, they are also available directly:
 
 ```bash
-python scripts/deutsch_dna.py mission-create --goal "Cuma Almanca iş görüşmem var." --scenario interview --deadline cuma
-python scripts/deutsch_dna.py mission-list
-python scripts/deutsch_dna.py mission-start g_...
-python scripts/deutsch_dna.py mission-show g_...
+python scripts/deutsch_loop.py mission-create --goal "Cuma Almanca iş görüşmem var." --scenario interview --deadline cuma
+python scripts/deutsch_loop.py mission-list
+python scripts/deutsch_loop.py mission-start g_...
+python scripts/deutsch_loop.py mission-show g_...
 ```
 
 Use the returned mission ID. `--deadline` accepts an ISO date, today/tomorrow, or a weekday in English, German, or Turkish. A bare weekday includes today when it matches the local calendar; use an explicit date for a later week's event. An overdue plan remains active until the learner completes or cancels it.
@@ -36,15 +36,15 @@ Use the returned mission ID. `--deadline` accepts an ISO date, today/tomorrow, o
 The scene uses the ordinary `roleplay-turn`, `roleplay-stop`, feedback, vocabulary, and `roleplay-finish` flow. Mark a real partner hint with `--support hint`, and a supplied answer with `--support shown`. Then cite actual learner turn IDs in the completed scene:
 
 ```bash
-python scripts/deutsch_dna.py mission-assess g_... --session-id s_... --result achieved --support none --evidence-turn-id t_... --note "Introduced experience and motivation without help."
+python scripts/deutsch_loop.py mission-assess g_... --session-id s_... --result achieved --support none --evidence-turn-id t_... --note "Introduced experience and motivation without help."
 ```
 
 Use `practice` when the communication goal is unmet or needed support. Repeating an identical assessment is safe; changing it requires `mission-undo`. Undo is blocked while a newer scene is awaiting assessment, so its evidence cannot be applied to an older step. Mission operations do not advance the grammar review ladder.
 
 ```bash
-python scripts/deutsch_dna.py mission-update g_... --deadline 2026-10-09
-python scripts/deutsch_dna.py mission-update g_... --cancel
-python scripts/deutsch_dna.py dashboard --output my-progress.html
+python scripts/deutsch_loop.py mission-update g_... --deadline 2026-10-09
+python scripts/deutsch_loop.py mission-update g_... --cancel
+python scripts/deutsch_loop.py dashboard --output my-progress.html
 ```
 
 Plans live locally in `missions.json` beside the existing learner files. The dashboard shows active/completed goals, their steps and previous evidence, and the roleplay catalog. It remains a snapshot; practising happens in the tutor chat.

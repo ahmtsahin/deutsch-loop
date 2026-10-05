@@ -6,7 +6,7 @@ import json
 from datetime import timedelta
 from unittest import mock
 
-from test_deutsch_dna import BASE_TIME, StoreTestCase, dna
+from test_deutsch_loop import BASE_TIME, StoreTestCase, dna
 
 
 PARTNER_LINE = "Haben Sie reserviert? Die Reservierung ist auf den Namen Sahin."
@@ -84,11 +84,11 @@ class VocabularyTests(StoreTestCase):
         _, results = self.scene_with_words()
         word_id = results[0]["word"]["id"]
         prompt = "Du rufst im Hotel an. Sag mit rezervasyon yapmak, dass du ein Zimmer willst."
-        with self.assertRaisesRegex(dna.DeutschDNAError, "not due"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "not due"):
             self.store.vocab_grade(word_id, result="pass", prompt=prompt, answer="Ich möchte ein Zimmer reservieren.",
                                    at=BASE_TIME + timedelta(hours=2))
         moment = BASE_TIME + timedelta(days=1, hours=1)
-        with self.assertRaisesRegex(dna.DeutschDNAError, "already seen"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "already seen"):
             self.store.vocab_grade(word_id, result="pass", prompt=prompt, answer=PARTNER_LINE, at=moment)
         word, status = self.store.vocab_grade(word_id, result="pass", prompt=prompt,
                                               answer="Ich möchte ein Zimmer reservieren.", at=moment)
@@ -97,7 +97,7 @@ class VocabularyTests(StoreTestCase):
                                           answer="Ich möchte ein Zimmer reservieren.", at=moment + timedelta(minutes=1))
         self.assertEqual(retry, "duplicate")
         later = moment + timedelta(days=3)
-        with self.assertRaisesRegex(dna.DeutschDNAError, "prompt was already used"):
+        with self.assertRaisesRegex(dna.DeutschLoopError, "prompt was already used"):
             self.store.vocab_grade(word_id, result="pass", prompt=prompt, answer="Wir haben schon reserviert.", at=later)
         hard, _ = self.store.vocab_grade(word_id, result="hard", prompt="Der Chef fragt nach dem Tisch fürs Teamessen.",
                                          answer="Ich habe den Tisch reserviert.", at=later)
@@ -136,7 +136,7 @@ class VocabularyTests(StoreTestCase):
         self.assertEqual(self.store.vocab_list(), [])
         self.store.roleplay_finish(identifier, at=BASE_TIME + timedelta(minutes=10))
         self.assertEqual(self.store.roleplay_show(identifier)["debrief"]["vocabulary"], [])
-        with self.assertRaises(dna.DeutschDNAError):
+        with self.assertRaises(dna.DeutschLoopError):
             self.store.vocab_undo(word_id)
 
     def test_undoing_a_known_word_restores_its_card_and_keeps_the_earlier_scene(self):
@@ -160,11 +160,11 @@ class VocabularyTests(StoreTestCase):
 
         def deck_write_fails(path, value):
             if path.name == "vocabulary.json":
-                raise dna.DeutschDNAError("disk full")
+                raise dna.DeutschLoopError("disk full")
             real_write(path, value)
 
         with mock.patch.object(dna, "_atomic_write", side_effect=deck_write_fails):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.store.roleplay_vocab(identifier, term="reservieren", surface="reserviert",
                                           meaning="rezervasyon yapmak", turn_id=turn["id"])
         self.assertEqual(self.store.vocab_list(), [])
@@ -180,11 +180,11 @@ class VocabularyTests(StoreTestCase):
 
         def scene_write_fails(path, value):
             if path.name == "sessions.json":
-                raise dna.DeutschDNAError("disk full")
+                raise dna.DeutschLoopError("disk full")
             real_write(path, value)
 
         with mock.patch.object(dna, "_atomic_write", side_effect=scene_write_fails):
-            with self.assertRaises(dna.DeutschDNAError):
+            with self.assertRaises(dna.DeutschLoopError):
                 self.store.vocab_forget(word_id)
         self.store.vocab_forget(word_id)
         self.assertEqual(self.store.vocab_list(), [])

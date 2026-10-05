@@ -1,10 +1,10 @@
-# DeutschDNA
+# DeutschLoop
 
 **A German tutor that remembers your mistakes.**
 
 It runs inside Claude Code and Codex. Every mistake is filed under its root cause and comes back in a new sentence until it stops. Your history stays on your own machine, and there is no extra API key.
 
-[![Tests](https://github.com/ahmtsahin/deutsch-dna/actions/workflows/tests.yml/badge.svg)](https://github.com/ahmtsahin/deutsch-dna/actions/workflows/tests.yml)
+[![Tests](https://github.com/ahmtsahin/deutsch-loop/actions/workflows/tests.yml/badge.svg)](https://github.com/ahmtsahin/deutsch-loop/actions/workflows/tests.yml)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB)
 ![Runtime dependencies: none](https://img.shields.io/badge/runtime%20dependencies-none-2ea44f)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
@@ -36,65 +36,65 @@ Both demos are self-contained offline HTML files: no installation, account, API 
 For your own saved learning history:
 
 ```bash
-python scripts/deutsch_dna.py dashboard --output my-progress.html
+python scripts/deutsch_loop.py dashboard --output my-progress.html
 ```
 
 Open the resulting file in your browser. It contains your exported sentences, stays offline, and leaves your learning records and review schedule unchanged. Export again to refresh it; replacing an existing HTML file requires `--force`. [Dashboard guide](docs/dashboard.md).
 
 ## Install
 
-Requires **Python 3.10+** and Claude Code or Codex. No runtime packages, extra API key, server, or database to set up. Your existing model teaches; progress is stored locally in `~/.deutschdna`.
+Requires **Python 3.10+** and Claude Code or Codex. No runtime packages, extra API key, server, or database to set up. Your existing model teaches; progress is stored locally in `~/.deutschloop`.
 
 **Claude Code**
 
 ```bash
-git clone https://github.com/ahmtsahin/deutsch-dna.git "$HOME/.claude/skills/deutsch-dna"
+git clone https://github.com/ahmtsahin/deutsch-loop.git "$HOME/.claude/skills/deutsch-loop"
 ```
 
-Start a chat with **`/deutsch-dna`**.
+Start a chat with **`/deutsch-loop`**.
 
 **Claude Code, as a plugin**
 
 ```bash
-claude plugin marketplace add ahmtsahin/deutsch-dna
-claude plugin install deutsch-dna@deutsch-dna
+claude plugin marketplace add ahmtsahin/deutsch-loop
+claude plugin install deutsch-loop@deutsch-loop
 ```
 
-Start a chat with **`/deutsch-dna:deutsch-dna`**.
+Start a chat with **`/deutsch-loop:deutsch-loop`**.
 
 **Codex**
 
 ```bash
-git clone https://github.com/ahmtsahin/deutsch-dna.git "$HOME/.agents/skills/deutsch-dna"
+git clone https://github.com/ahmtsahin/deutsch-loop.git "$HOME/.agents/skills/deutsch-loop"
 ```
 
-Start a chat with **`$deutsch-dna`**.
+Start a chat with **`$deutsch-loop`**.
 
 **Codex, as a plugin**
 
 ```bash
-codex plugin marketplace add ahmtsahin/deutsch-dna
-codex plugin add deutsch-dna@deutsch-dna
+codex plugin marketplace add ahmtsahin/deutsch-loop
+codex plugin add deutsch-loop@deutsch-loop
 ```
 
-Start a new chat with **`$deutsch-dna:deutsch-dna`**.
+Start a new chat with **`$deutsch-loop:deutsch-loop`**.
 
 The tutor gives you one small German task right away. You can ask for explanations in your own language. Your name and goals are optional.
 
-The commands work in macOS/Linux terminals and PowerShell. Use either the cloned folder or the plugin, so that the skill appears once. For project-only installation, Python on Windows, or the one-time permission setup that lets the tutor save progress, see [installation and permissions](docs/setup.md).
+The commands work in macOS/Linux terminals and PowerShell. Use either the cloned folder or the plugin, so that the skill appears once. For project-only installation, Python on Windows, or the one-time permission setup that lets the tutor save progress, see [installation and permissions](docs/setup.md). Used it under its old name, DeutschDNA? Your progress carries over; [here is what changes](docs/setup.md#installed-under-the-old-name-deutschdna).
 
 ## Why not just ask a chatbot?
 
 You can, and the correction will be fine. Then the chat ends. Next week you write *mit mein Chef* again, and nothing notices.
 
-| | A chat on its own | With DeutschDNA |
+| | A chat on its own | With DeutschLoop |
 | --- | --- | --- |
 | Your mistake | Corrected once | Filed under its root cause, with your sentence and the date |
 | What you practise | Whatever you ask for | What is due: a pattern returns after 1, 3, 7, 14, 30, and 60 days |
 | The exercise | Often the sentence you just saw | A new situation every time; repeats are refused |
 | The hint that worked | Gone with the chat | Saved for the next time you are stuck |
 | “You have improved” | Easy to say | Needs a new sentence, without help, on a later day |
-| The record | Wherever the chat product keeps it | Plain JSON in `~/.deutschdna` that you can read, copy, or delete |
+| The record | Wherever the chat product keeps it | Plain JSON in `~/.deutschloop` that you can read, copy, or delete |
 
 ## What happens when you answer
 
@@ -112,10 +112,10 @@ Tutor   Correct, with no help: einen großen Tisch and einen bequemen Sessel
         That pattern moves up to step 1/6 and comes back on Friday at 22:39.
 ```
 
-Once a week, or when you ask “How am I doing?”, you get the profile that gives the project its name:
+Once a week, or when you ask “How am I doing?”, you get your FehlerDNA profile:
 
 ```text
-DeutschDNA · Alex · B2
+FehlerDNA · Alex · B2
 14 Muster · 2 gemeistert · 29× falsch · 72× richtig · 17 Tage in Folge · 2 fällig
 
 Artikel         ████████░░  78%   1 Muster  · 1 gemeistert · 1× falsch · 6× richtig
@@ -190,8 +190,8 @@ There are fifteen roleplay frames, including interviews, presentations, train tr
 <td><b>The next day: a new sentence, without help.</b><br>Yesterday you needed the hint. Today the same pattern works in a sentence you have never written.<br><br>Scripted learner, real engine. <a href="demo/learning-loop.png">Static view</a></td>
 </tr>
 <tr>
-<td width="330"><img src="demo/deutschdna.gif" width="300" alt="An old mistake returns after 103 days. DeutschDNA still has the first sentence, its correction, and the hint that helped, ready for renewed practice."></td>
-<td><b>103 days later: the mistake returns.</b><br>Your first sentence, its correction, and the hint that helped are still there.<br><br>Scripted learner, real engine. <a href="demo/deutschdna.png">Static view</a></td>
+<td width="330"><img src="demo/history.gif" width="300" alt="An old mistake returns after 103 days. DeutschLoop still has the first sentence, its correction, and the hint that helped, ready for renewed practice."></td>
+<td><b>103 days later: the mistake returns.</b><br>Your first sentence, its correction, and the hint that helped are still there.<br><br>Scripted learner, real engine. <a href="demo/history.png">Static view</a></td>
 </tr>
 </table>
 
@@ -200,9 +200,9 @@ There are fifteen roleplay frames, including interviews, presentations, train tr
 ```mermaid
 flowchart LR
     you(["You"]) -- "German" --> agent["Claude Code or Codex<br/>teaches and judges the language"]
-    agent -- "record · grade · coach · recap" --> engine["deutsch_dna.py<br/>schedules, counts, refuses shortcuts"]
+    agent -- "record · grade · coach · recap" --> engine["deutsch_loop.py<br/>schedules, counts, refuses shortcuts"]
     engine -- "board, due patterns, evidence" --> agent
-    engine <--> state[("~/.deutschdna<br/>plain JSON")]
+    engine <--> state[("~/.deutschloop<br/>plain JSON")]
 ```
 
 - **The skill** is [`SKILL.md`](SKILL.md) and eight [references](references): how to correct minimally, when to give a hint instead of the answer, how to continue real-life preparation, and what may be claimed about progress.
@@ -224,7 +224,7 @@ This uses a fresh demo directory. For the four-month story, run `python scripts/
 
 ## About the demos
 
-Learner messages are scripted so that every demo can be reproduced. The opening image and the first-day story show actual, unedited Claude Code replies. Boards, dates, counts, and histories come from the engine. The four-month history is seeded through the engine by `scripts/demo.py`; nobody waited four months for it.
+Learner messages are scripted so that every demo can be reproduced. The opening image and the first-day story show actual Claude Code replies. They were recorded under the project's old name, DeutschDNA, and only the name was changed afterwards; the board in the opening image now reads FehlerDNA. Boards, dates, counts, and histories come from the engine. The four-month history is seeded through the engine by `scripts/demo.py`; nobody waited four months for it.
 
 The first example and teaching milestones survive the rolling history limits. Progress scores describe tracked patterns, not overall German proficiency. Text practice works directly; microphone capture and pronunciation scoring are not included.
 
