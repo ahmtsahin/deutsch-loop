@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { NochmalCard, NochmalDnaRow, NochmalFeedback, NochmalScene } from '../types'
+import type { NochmalCard, NochmalDnaRow, NochmalExam, NochmalFeedback, NochmalScene } from '../types'
 
 // The learner's state belongs to the DeutschLoop engine: this mod reads it through the
 // CLI, and only grade / vocab-grade change it, so the engine's own rules still hold
@@ -22,9 +22,11 @@ const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 const LATER = /^(später|spaeter|skip|weg)$/i
 const DNA_PANE = 'fehlerdna'
 const SCENE_PANE = 'szene'
+const EXAM_PANE = 'pruefung'
 const ENGINE_CALL = /deutsch_(loop|dna)\.py/
 const SCENE_CALL = /\b(roleplay-start|speak|mission-start|roleplay-turn|roleplay-stop|roleplay-finish)\b/
 const RECORD_CALL = /\b(record|observe|coach|grade|vocab-grade|undo|forget|merge|rename)\b/
+const EXAM_CALL = /\bexam-(start|submit|stop|score|finish|cancel)\b/
 const ENDED_PANE_MS = 20_000
 // What Hilfe sends: the tutor answers in role, and the mod makes sure the hint is saved as help.
 const HELP_PROMPT =
@@ -37,6 +39,7 @@ const isJudging = atom({ plugin: 'nochmal', key: 'isJudging' } as const, false)
 const feedback = atom({ plugin: 'nochmal', key: 'feedback' } as const, null)
 const dna = atom({ plugin: 'nochmal', key: 'dna' } as const, null)
 const scene = atom({ plugin: 'nochmal', key: 'scene' } as const, null)
+const exam = atom({ plugin: 'nochmal', key: 'exam' } as const, null)
 
 type Cli = { ok: true; data: any } | { ok: false; error: string }
 type Raw = { ok: true; stdout: string } | { ok: false; error: string }
@@ -106,11 +109,15 @@ let turnTimer: { cancel: () => void } | undefined
 let feedbackTimer: { cancel: () => void } | undefined
 let ticker: { cancel: () => void } | undefined
 let sceneCloser: { cancel: () => void } | undefined
+let examCloser: { cancel: () => void } | undefined
 let frames: Record<string, { title?: string; learner_goal?: string }> | undefined
 
 const ladder = (step: number) => '▰'.repeat(Math.min(step, LADDER)) + '▱'.repeat(Math.max(0, LADDER - step))
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+
+/** `2026-11-10T15:42:00+01:00` → `15:42`. */
+const hour = (iso: string | null) => (iso ?? '').slice(11, 16)
 
 const fit = (text: string, width: number) =>
   text.length > width ? `${text.slice(0, width - 1)}…` : text.padEnd(width)
@@ -419,8 +426,7 @@ async function refreshScene($: EngineInterface, output?: string) {
     if (held?.isActive) {
       const endedSeconds = Number(active?.elapsed_seconds ?? Math.max(0, Math.floor((nowMs - held.startedAtMs) / 1000)))
       await update($, scene, view => (view ? { ...view, isActive: false, isHelpPending: false, endedSeconds } : view))
-      ticker?.cancel()
-      ticker = undefined
+      await restTicker($)
       sceneCloser?.cancel()
       sceneCloser = $.clock.after(ENDED_PANE_MS, () => void closeScene($).catch(quiet))
     }
@@ -458,6 +464,66 @@ async function refreshScene($: EngineInterface, output?: string) {
   }
 }
 
+/** The one-second redraw stops once neither a scene nor an exam has a running clock. */
+async function restTicker($: EngineInterface) {
+  if ((await read($, scene))?.isActive || (await read($, exam))?.isActive) return
+  ticker?.cancel()
+  ticker = undefined
+}
+
+/** Follows the engine's running practice exam: its clock, its tasks, and the words of each submitted text. */
+async function refreshExam($: EngineInterface) {
+  const recap = await cli($, ['recap'])
+  if (!recap.ok) return
+  const active = recap.data.active_exam
+  const held = await read($, exam)
+  const nowMs = await $.clock.now()
+  const listed: any[] | null = Array.isArray(active?.tasks) ? active.tasks : null
+  const tasks = listed?.map(task => ({
+    number: Number(task.number),
+    type: String(task.type ?? ''),
+    wordsLabel: task.words_label ?? null,
+    words: task.words ?? null,
+    isSubmitted: Boolean(task.submitted),
+    isLate: Boolean(task.late),
+  }))
+  if (!active || active.status !== 'active') {
+    if (held?.isActive) {
+      const endedSeconds = Number(active?.elapsed_seconds ?? Math.max(0, Math.floor((nowMs - held.startedAtMs) / 1000)))
+      await update($, exam, view => (view ? { ...view, tasks: tasks ?? view.tasks, isActive: false, endedSeconds } : view))
+      await restTicker($)
+      examCloser?.cancel()
+      examCloser = $.clock.after(ENDED_PANE_MS, () => void closeExam($).catch(quiet))
+    }
+    return
+  }
+  const view: NochmalExam = {
+    id: String(active.session_id),
+    title: String(active.title ?? active.exam),
+    part: String(active.part ?? ''),
+    startedAtMs: Date.parse(active.started_at_local) || nowMs,
+    targetSeconds: Number(active.target_seconds ?? 0),
+    deadlineLocal: active.deadline_local ?? null,
+    tasks: tasks ?? [],
+    isActive: true,
+    endedSeconds: null,
+  }
+  await update($, exam, () => view)
+  examCloser?.cancel()
+  if (!ticker) ticker = $.clock.every(1000, () => $.ui.invalidate('ui.render'))
+  if (!(await $.ui.panes()).some(pane => pane.id === EXAM_PANE)) {
+    const opened = await $.ui.open({ id: EXAM_PANE, title: `Prüfung · ${view.title}` })
+    if (!opened.isPlaced) $.ui.toast('Eine Prüfung läuft: /pruefung zeigt die Uhr.')
+  }
+}
+
+async function closeExam($: EngineInterface) {
+  const held = await read($, exam)
+  if (held?.isActive) return
+  await $.ui.close({ id: EXAM_PANE })
+  await update($, exam, () => null)
+}
+
 async function closeScene($: EngineInterface) {
   const held = await read($, scene)
   if (held?.isActive) return
@@ -489,7 +555,8 @@ async function engineCall($: EngineInterface, e: any, next: (call: any) => Promi
   const ran = await next(call)
   const output = typeof ran?.text === 'string' ? ran.text : ran?.result?.stdout
   if (SCENE_CALL.test(command)) await refreshScene($, output)
-  if (RECORD_CALL.test(command) || SCENE_CALL.test(command)) {
+  if (EXAM_CALL.test(command)) await refreshExam($)
+  if (RECORD_CALL.test(command) || SCENE_CALL.test(command) || EXAM_CALL.test(command)) {
     void refreshDnaIfOpen($).catch(quiet)
     void refreshStatus($).catch(quiet)
   }
@@ -527,6 +594,11 @@ export const register: Register = on => {
       description: 'Show the running roleplay scene: role, goal, turns, time, and a Hilfe button (DeutschLoop)',
       immediate: true,
     })
+    await $.command.register({
+      name: 'pruefung',
+      description: 'Show the running practice exam: its clock, tasks, and submitted word counts (DeutschLoop)',
+      immediate: true,
+    })
     const held = await read($, card)
     if (held && held.writer !== CARD_WRITER) {
       await update($, card, () => null)
@@ -540,8 +612,8 @@ export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     isTurnRunning = true
     turnTimer?.cancel()
-    // A tutoring turn or a running scene needs no second card.
-    const isPlaying = (await read($, scene))?.isActive
+    // A tutoring turn, a running scene, or a running exam needs no second card.
+    const isPlaying = (await read($, scene))?.isActive || (await read($, exam))?.isActive
     if (!isPlaying && !/deutsch-loop|deutsch-dna/i.test(e.text)) {
       turnTimer = $.clock.after(WAIT_MS, () => void showDuringTurn($).catch(quiet))
     }
@@ -598,6 +670,45 @@ export const register: Register = on => {
     if (!held) return { text: 'Szene: Gerade läuft keine Szene.' }
     await $.ui.open({ id: SCENE_PANE, title: `Szene · ${held.title}` })
     return { text: `Szene: ${held.title}.` }
+  })
+
+  on('command.run', { command: 'pruefung' }, async $ => {
+    await refreshExam($)
+    const held = await read($, exam)
+    if (!held) return { text: 'Prüfung: Gerade läuft keine Prüfung.' }
+    await $.ui.open({ id: EXAM_PANE, title: `Prüfung · ${held.title}` })
+    return { text: `Prüfung: ${held.title}.` }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: EXAM_PANE }, async ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+    const view = await read($, exam)
+    if (!view) return <Text dimColor>Gerade läuft keine Prüfung.</Text>
+    const nowMs = await $.clock.now()
+    const seconds = view.isActive ? Math.max(0, Math.floor((nowMs - view.startedAtMs) / 1000)) : view.endedSeconds ?? 0
+    const left = Math.max(0, view.targetSeconds - seconds)
+    const filled = Math.round(Math.min(1, seconds / Math.max(1, view.targetSeconds)) * 10)
+    const rows = [
+      <Text color={TITLE} bold wrap="wrap">{[view.title, view.part].filter(Boolean).join(' · ')}</Text>,
+      <Text>{`Zeit: ${clock(seconds)} / ${clock(view.targetSeconds)}  ${'█'.repeat(filled)}${'░'.repeat(10 - filled)}`}</Text>,
+    ]
+    if (view.isActive && left > 0) rows.push(<Text>{`Noch ${clock(left)} · Abgabe bis ${hour(view.deadlineLocal)} Uhr`}</Text>)
+    if (view.isActive && left === 0) {
+      rows.push(<Text color="warning" wrap="wrap">{`Die Zeit ist um: Abgabe war um ${hour(view.deadlineLocal)} Uhr.`}</Text>)
+    }
+    for (const task of view.tasks) {
+      const state = task.isSubmitted ? `abgegeben, ${task.words ?? 0} Wörter${task.isLate ? ', nach der Zeit' : ''}` : 'offen'
+      const name = [`Aufgabe ${task.number}`, task.type, task.wordsLabel].filter(Boolean).join(' · ')
+      rows.push(<Text wrap="wrap" dimColor={task.isSubmitted ? true : undefined}>{`${name}: ${state}`}</Text>)
+    }
+    rows.push(
+      view.isActive ? (
+        <Text dimColor wrap="wrap">Bis zur Abgabe gibt es keine Hilfe und keine Korrekturen. Mit „Abgeben“ endet die Prüfung.</Text>
+      ) : (
+        <Text wrap="wrap">Die Prüfung ist beendet. Die Auswertung kommt im Chat.</Text>
+      ),
+    )
+    return <Box flexDirection="column">{rows}</Box>
   })
 
   on('ui.render', { component: 'Pane', requestId: DNA_PANE }, async ($, e) => {

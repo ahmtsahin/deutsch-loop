@@ -128,6 +128,7 @@ claude plugin install nochmal@deutsch-loop
 | `/nochmal später` | Puts the card away until the next long turn |
 | `/fehlerdna` | Opens the FehlerDNA pane |
 | `/szene` | Opens the pane of the running scene |
+| `/pruefung` | Opens the clock of a running practice exam |
 
 The companion reads the same memory as the tutor and starts after your first session with it. It grades nothing on its own: every card goes through the engine's `grade` and `vocab-grade`, so a card appears only when a pattern is due, a situation is never reused, and a hinted answer cannot pass. Writing a card and checking an answer each take one Sonnet call through your Claude Code login.
 
@@ -262,9 +263,10 @@ A pattern is mastered after six passed reviews. A failed review sends it back to
 | “I have a German job interview on Friday.” | A saved three-step preparation plan, adapted across scenes and chats to your actual answers, help used, and recorded mistakes. |
 | “Continue my interview preparation.” | Resume the current scene, unfinished assessment, or next communication task. |
 | “Let's practise words.” | Vocabulary from your scenes returns in spaced reviews. |
+| „Goethe B1 Schreiben üben.“ | The writing part under exam conditions: new tasks, a clock the engine keeps, points from the exam's own table, and your mistakes filed afterwards. Goethe B1/B2, telc B1/B2, and DTZ. [Guide](docs/exams.md) |
 | “How am I doing?” | Your recorded progress, with the sentences behind it. Ask for a visual view to get an offline, interactive learning story. |
 | “That wasn't a mistake.” | The tutor can undo the correction and restore its schedule. |
-| `/nochmal`, `/fehlerdna`, `/szene` | With the [companion](#new-practise-while-claude-works): a card, your FehlerDNA, the running scene. |
+| `/nochmal`, `/fehlerdna`, `/szene`, `/pruefung` | With the [companion](#new-practise-while-claude-works): a card, your FehlerDNA, the running scene, the exam clock. |
 
 During a roleplay, ordinary corrections wait until the debrief. Start with “Restoranda konuşalım” or “Roleplay Restaurant”; finish with “bitir” or “stop roleplay”. The reply includes up to three corrections and useful vocabulary:
 
@@ -331,9 +333,9 @@ flowchart LR
     companion -- "recap · due · grade" --> engine
 ```
 
-- **The skill** is [`SKILL.md`](SKILL.md) and eight [references](references): how to correct minimally, when to give a hint instead of the answer, how to continue real-life preparation, and what may be claimed about progress.
-- **The engine** is one Python file with no dependencies, plus a bundled scenario catalog and dashboard template. It stores patterns and preparation plans, schedules reviews, remembers helpful cues, supports undo, and exports an offline dashboard. 190 tests run on Linux, macOS, and Windows.
-- **The companion** is an optional Claude Code plugin in [`mods/nochmal`](mods/nochmal). It drives the same CLI, never edits the memory files, and has 15 tests of its own. [Companion guide](docs/companion.md).
+- **The skill** is [`SKILL.md`](SKILL.md) and nine [references](references): how to correct minimally, when to give a hint instead of the answer, how to continue real-life preparation, how to run a practice exam, and what may be claimed about progress.
+- **The engine** is one Python file with no dependencies, plus a bundled scenario catalog, exam catalog, and dashboard template. It stores patterns and preparation plans, schedules reviews, remembers helpful cues, supports undo, times and scores practice exams, and exports an offline dashboard. 219 tests run on Linux, macOS, and Windows.
+- **The companion** is an optional Claude Code plugin in [`mods/nochmal`](mods/nochmal). It drives the same CLI, never edits the memory files, and has 17 tests of its own. [Companion guide](docs/companion.md).
 - **The catalog** names [about a hundred root causes](references/patterns.md) of typical mistakes, so that *mit mein Chef* and *mit meine Schwester* count as one problem and not two.
 - **Nothing else.** No account, server, or telemetry. Your messages go to the model you already use, as in any other chat there. Only the memory is new, and it is a folder of JSON files.
 
@@ -366,7 +368,8 @@ The easiest place to help is the [pattern catalog](references/patterns.md). It h
 - Available: the Claude Code companion, with a status line, cards while Claude works, and live FehlerDNA and scene panes.
 - Available: three-step preparation for real-life goals across scenes and chats, with fifteen roleplay frames.
 - Available: an offline local dashboard and an interactive example history.
-- Planned: Goethe B1/B2, telc B1/B2, and telc Deutsch Beruf exam modes.
+- Available: the writing part of Goethe B1/B2, telc B1/B2, and the Deutsch-Test für Zuwanderer as timed practice, rated with each exam's own scheme.
+- Planned: telc Deutsch Beruf, and the other exam parts.
 - Exploring: voice practice and pronunciation fingerprint.
 
 ## License

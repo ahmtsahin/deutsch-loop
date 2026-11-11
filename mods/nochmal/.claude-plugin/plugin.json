@@ -1,7 +1,7 @@
 {
   "name": "nochmal",
-  "version": "0.1.0",
-  "description": "DeutschLoop's Claude Code companion: what is due in the status line, a FehlerDNA card while Claude works, a live FehlerDNA pane, and a roleplay scene pane with an honest Hilfe button.",
+  "version": "0.2.0",
+  "description": "DeutschLoop's Claude Code companion: what is due in the status line, a FehlerDNA card while Claude works, a live FehlerDNA pane, a roleplay scene pane with an honest Hilfe button, and a clock for practice exams.",
   "author": {
     "name": "Ahmet Sahin",
     "url": "https://github.com/ahmtsahin"

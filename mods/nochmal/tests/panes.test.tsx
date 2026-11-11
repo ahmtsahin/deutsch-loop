@@ -101,3 +101,36 @@ test('commands that are not DeutschLoop’s pass through untouched', async ($, o
   expect(stand.commands).toEqual(['git status'])
   expect(stand.runs).toEqual([])
 })
+
+test('a practice exam the tutor starts opens its clock, and a submitted text shows its words', async ($, on) => {
+  const stand = standIns(on)
+  await $.tool.call(bash("python scripts/deutsch_loop.py exam-start --exam goethe-b1 --task 'Aufgabe 1' --task 'Aufgabe 3'"))
+  expect(stand.panes).toContain('pruefung')
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'nochmal', surface, ...PANE('pruefung') })
+    expect(await ui.find({ type: 'Text', text: 'Goethe-Zertifikat B1 · Schreiben' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^Zeit: 10:00 \/ 60:00 {2}█{2}░{8}$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Noch 50:00 · Abgabe bis 12:50 Uhr' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'Aufgabe 1 · Persönliche E-Mail · circa 80 Wörter: offen' })).toBeDefined()
+    await ui.unmount()
+  }
+  await $.tool.call(bash("python scripts/deutsch_loop.py exam-submit s_9 --task 1 --text 'Lieber Jonas, …'"))
+  const after = await $.ui.mount({ plugin: 'nochmal', surface: 'desktop', ...PANE('pruefung') })
+  expect(await after.find({ type: 'Text', text: 'Aufgabe 1 · Persönliche E-Mail · circa 80 Wörter: abgegeben, 74 Wörter' })).toBeDefined()
+  expect(await after.find({ type: 'Text', text: 'Aufgabe 3 · Kurze höfliche E-Mail · circa 40 Wörter: offen' })).toBeDefined()
+  await after.unmount()
+  // The exam is the tutor's: the companion only reads its clock.
+  expect(stand.runs.every(argv => !argv.some(part => part.startsWith('exam-')))).toBe(true)
+})
+
+test('a handed-in exam says so, then its clock closes', async ($, on) => {
+  const stand = standIns(on)
+  await $.tool.call(bash("python scripts/deutsch_loop.py exam-start --exam goethe-b1 --task 'Aufgabe 1' --task 'Aufgabe 3'"))
+  await $.tool.call(bash('python scripts/deutsch_loop.py exam-stop s_9'))
+  const ui = await $.ui.mount({ plugin: 'nochmal', surface: 'desktop', ...PANE('pruefung') })
+  expect(await ui.find({ type: 'Text', text: 'Die Prüfung ist beendet. Die Auswertung kommt im Chat.' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Noch / })).toBeUndefined()
+  await ui.unmount()
+  await stand.clock.advance(20_000)
+  expect(stand.panes).not.toContain('pruefung')
+})

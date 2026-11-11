@@ -51,6 +51,10 @@ export type Stand = {
   commands: string[]
   isPlaying: boolean
   helps: number
+  /** The practice exam the stand-in engine holds: running, handed in, or none. */
+  exam: 'active' | 'debriefing' | null
+  /** Words of the text submitted for task 1; null while that task is open. */
+  examWords: number | null
   clock: ReturnType<typeof mock.clock>
 }
 
@@ -59,6 +63,7 @@ type Verdict = { verdict: string; correction: string; note: string }
 export function standIns(on: On, verdict: Verdict = { verdict: 'pass', correction: '', note: 'Akkusativ doğru.' }, hasLearner = true): Stand {
   const stand: Stand = {
     state: new Map(), runs: [], statuses: [], panes: [], prompts: [], commands: [], isPlaying: false, helps: 0,
+    exam: null, examWords: null,
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 5, 10, 0) }),
   }
   mock.env(on, { USERPROFILE: 'C:\\Users\\test' })
@@ -116,6 +121,16 @@ export function standIns(on: On, verdict: Verdict = { verdict: 'pass', correctio
           ? { session_id: 's_1', scenario: 'restaurant', status: 'active', elapsed_seconds: 30, target_seconds: 300,
               learner_turns: 2, should_close: false, started_at_local: '2026-10-05T11:59:30+02:00' }
           : null,
+        active_exam: stand.exam
+          ? { session_id: 's_9', exam: 'goethe-b1', title: 'Goethe-Zertifikat B1', part: 'Schreiben', status: stand.exam,
+              elapsed_seconds: 600, target_seconds: 3600, remaining_seconds: stand.exam === 'active' ? 3000 : 0,
+              time_is_up: false, started_at_local: '2026-10-05T11:50:00+02:00', deadline_local: '2026-10-05T12:50:00+02:00',
+              tasks: [
+                { number: 1, type: 'Persönliche E-Mail', words_label: 'circa 80 Wörter', submitted: stand.examWords !== null,
+                  words: stand.examWords, late: false },
+                { number: 3, type: 'Kurze höfliche E-Mail', words_label: 'circa 40 Wörter', submitted: false, words: null, late: false },
+              ] }
+          : null,
       })
     }
     if (command === 'due') {
@@ -146,6 +161,10 @@ export function standIns(on: On, verdict: Verdict = { verdict: 'pass', correctio
     if (/\bspeak\b/.test(command)) stand.isPlaying = true
     if (/roleplay-stop/.test(command)) stand.isPlaying = false
     if (/roleplay-turn/.test(command) && /--support (hint|shown)/.test(command)) stand.helps += 1
+    if (/exam-start/.test(command)) stand.exam = 'active'
+    if (/exam-submit/.test(command)) stand.examWords = 74
+    if (/exam-stop/.test(command)) stand.exam = 'debriefing'
+    if (/exam-(finish|cancel)/.test(command)) stand.exam = null
     const stdout = /\bspeak\b/.test(command) ? SPEAK_OUTPUT : '{"status": "stored"}'
     return { result: { stdout, stderr: '', interrupted: false }, text: stdout } as any
   })

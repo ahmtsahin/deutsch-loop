@@ -33,6 +33,10 @@ python scripts/deutsch_loop.py summary --format text
 | `roleplay-turn`, `roleplay-stop` | Save actual turns and freeze scene duration before feedback |
 | `roleplay-vocab`, `roleplay-finish`, `roleplay-show` | Source-backed vocabulary and the session debrief |
 | `vocab-due`, `vocab-grade` | Spaced reviews of the words from your scenes |
+| `exam-formats` | The writing-part formats for [practice exams](exams.md), with their point tables and sources; does not initialize state |
+| `exam-start`, `exam-submit`, `exam-stop` | A timed practice exam: start the clock with new tasks, store the texts, hand in |
+| `exam-score`, `exam-finish` | Rate each task by the exam's criteria; the engine computes the points and writes the report |
+| `exam-show`, `exam-list`, `exam-cancel` | Inspect one exam, list the finished ones, or abandon an unfinished one |
 | `vocab-list`, `vocab-undo`, `vocab-forget` | Your word deck, and repairs to it |
 
 State lives in `~/.deutschloop`; set `DEUTSCHLOOP_HOME` or pass `--home` before the command to use another directory. Each command locks that directory, so an agent can run several commands in parallel without losing a write. The full contract, including idempotency and scoring, is in [references/cli-contract.md](../references/cli-contract.md).

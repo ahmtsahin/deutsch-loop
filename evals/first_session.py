@@ -175,7 +175,7 @@ def install_skill(source: Path, target: Path) -> None:
     shutil.copytree(source / "agents", target / "agents")
     shutil.copytree(source / "docs", target / "docs")
     (target / "scripts").mkdir()
-    for name in ("deutsch_loop.py", "scenario_catalog.py", "dashboard.html"):
+    for name in ("deutsch_loop.py", "scenario_catalog.py", "exam_catalog.py", "dashboard.html"):
         shutil.copy2(source / "scripts" / name, target / "scripts" / name)
     skill = re.sub(r"^name: .*$", f"name: {SKILL_NAME}", (source / "SKILL.md").read_text(encoding="utf-8"), count=1, flags=re.M)
     (target / "SKILL.md").write_bytes(skill.encode("utf-8"))

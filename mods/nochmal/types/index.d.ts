@@ -68,6 +68,29 @@ export type NochmalScene = {
   isHelpPending: boolean
 }
 
+/** A timed practice exam the tutor is running; the engine keeps its clock. */
+export type NochmalExam = {
+  id: string
+  title: string
+  /** The exam part, such as `Schreiben`. */
+  part: string
+  startedAtMs: number
+  targetSeconds: number
+  deadlineLocal: string | null
+  tasks: {
+    number: number
+    type: string
+    wordsLabel: string | null
+    /** Words of the submitted text as the engine counted them; null while the task is open. */
+    words: number | null
+    isSubmitted: boolean
+    isLate: boolean
+  }[]
+  isActive: boolean
+  /** Frozen length of an exam that was handed in. */
+  endedSeconds: number | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     nochmal: {
@@ -77,6 +100,7 @@ declare module 'claude-code' {
       feedback: NochmalFeedback | null
       dna: NochmalDna | null
       scene: NochmalScene | null
+      exam: NochmalExam | null
     }
   }
 }

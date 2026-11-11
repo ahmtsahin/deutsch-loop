@@ -55,6 +55,12 @@ python scripts/demo_missions.py --force
 
 It writes `demo/missions.html`. `tests/test_missions.py` covers persistence across chats, local deadlines, help/evidence gates, resumable scenes, adaptive focus, assessment idempotency, undo order, cancellation, and the isolated eval install's runtime assets. The example learner and communication judgments are scripted; the engine supplies their saved sources and progression.
 
+## Practice-exam formats
+
+`scripts/exam_catalog.py` holds the writing-part formats: minutes, tasks, criteria, rating bands, point tables, and knock-out rules. Every number in it must have been read in the provider's own published material; list those documents in `sources`, say in `source_note` which document gave what, and set `checked` to the day you read them. Where the numbers sit on a rating form, read the form with its layout (`pdftotext -table` keeps the rows together) instead of trusting the order of extracted text. Do not copy tasks from practice tests: `brief` describes the shape of a task, and the tutor writes a new one for each exam.
+
+`tests/test_exams.py` checks every shipped format for complete tables, descending points, a maximum that equals the sum of its best bands, and named sources, and it walks each one through a whole exam. The engine's own rules (the clock, late and replaced texts, refused ratings, knock-outs, the length floor, the report, cancellation) are tested with a made-up format, so a corrected number in the catalog does not break them. A session keeps a frozen copy of its format; changing the catalog never rescores a saved exam.
+
 The README screenshot, `demo/missions.png`, is captured from that HTML at a 960 px browser width and 2× pixel scale, with “The next session” selected and the previous-session evidence expanded. It includes the selected Real-life goals navigation tab, page heading, chapter controls, and mission panel. Refresh this screenshot when the demo's content or layout changes; the Python renderer regenerates the HTML only.
 
 ```bash

@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from exam_catalog import EXAMS, exam_formats, exam_snapshot, max_task_points, resolve_exam, score_task
 from scenario_catalog import SCENARIOS, SCENARIO_ALIASES, mission_steps, scenario_examples
 
 try:
@@ -66,6 +67,14 @@ SCENE_VOCABULARY_LIMIT = 5
 WORD_SOURCE_LIMIT = 5
 VOCABULARY_SCHEMA_VERSION = 1
 LEADING_ARTICLE = re.compile(r"^(der|die|das)\s+", re.IGNORECASE)
+# A practice exam is a session without a partner: the learner's texts are its turns.
+EXAM_SCENARIO = "pruefung"
+EXAM_SUPPORT_RANK = {"none": 0, "hint": 1, "shown": 2}
+# A text below this share of an approximate length, or below a stated minimum, is flagged in the report.
+EXAM_SHORT_TEXT_SHARE = 0.75
+EXAM_CORRECTION_ROWS = 6
+# The tutor needs a moment to pass a text on; a text that arrives this soon after the deadline is on time.
+EXAM_GRACE_SECONDS = 60
 
 CATEGORY_ORDER = (
     "article",
@@ -833,24 +842,7 @@ def session_debrief(
         {**item, "review": (cards.get(word_key(item["term"])) or {}).get("status")}
         for item in session.get("vocabulary", [])
     ]
-    patterns = {item["id"]: item for item in mistakes}
-    groups: dict[str, dict[str, Any]] = {}
-    seen = set()
-    for entry in session.get("feedback", []):
-        identifier = entry["mistake_id"]
-        identity = (identifier, entry["turn_id"], entry["original"])
-        if identifier not in patterns or identity in seen:
-            continue
-        seen.add(identity)
-        pattern = patterns[identifier]
-        group = groups.setdefault(identifier, {
-            "mistake_id": identifier, "label": display_label(pattern)[0], "rule": pattern["rule"],
-            "category": pattern["category"], "session_occurrences": 0,
-            "previously_tracked": identifier in session.get("known_pattern_ids", []),
-            "example": entry,
-        })
-        group["session_occurrences"] += 1
-    ranked = sorted(groups.values(), key=lambda item: (-int(item["previously_tracked"]), -item["session_occurrences"], item["label"]))
+    ranked = _feedback_groups(session, mistakes)
     return {
         "scenario": session["scenario"], "duration_seconds": session.get("duration_seconds"),
         "duration_source": session.get("duration_source", "unknown"), "learner_turns": session.get("turns") or 0,
@@ -886,6 +878,114 @@ def mission_view(mission: dict[str, Any], moment: datetime, sessions: list[dict[
             "pending_session_id": session["id"] if session and status == "active" else None,
             "next_action": next_action, "completed_at_local": local_iso(mission.get("completed_at")),
             "completion_basis": "Completed communication-practice steps; not a proficiency or readiness certificate."}
+
+
+def is_exam(session: dict[str, Any]) -> bool:
+    return session.get("type") == "exam"
+
+
+def count_words(text: str) -> int:
+    """Runs of letters or digits; a hyphen or an apostrophe stays inside its word."""
+    return len(re.findall(r"[^\W_]+(?:[-'’][^\W_]+)*", text))
+
+
+def _number(value: float) -> int | float:
+    return int(value) if float(value).is_integer() else round(float(value), 2)
+
+
+def _feedback_groups(session: dict[str, Any], mistakes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Confirmed errors linked to this session, one group per root cause, known and repeated ones first."""
+    patterns = {item["id"]: item for item in mistakes}
+    groups: dict[str, dict[str, Any]] = {}
+    seen = set()
+    for entry in session.get("feedback", []):
+        identifier = entry["mistake_id"]
+        identity = (identifier, entry["turn_id"], entry["original"])
+        if identifier not in patterns or identity in seen:
+            continue
+        seen.add(identity)
+        pattern = patterns[identifier]
+        group = groups.setdefault(identifier, {
+            "mistake_id": identifier, "label": display_label(pattern)[0], "rule": pattern["rule"],
+            "category": pattern["category"], "session_occurrences": 0,
+            "previously_tracked": identifier in session.get("known_pattern_ids", []),
+            "example": entry,
+        })
+        group["session_occurrences"] += 1
+    return sorted(groups.values(), key=lambda item: (-int(item["previously_tracked"]), -item["session_occurrences"], item["label"]))
+
+
+def exam_timing(session: dict[str, Any], moment: datetime) -> dict[str, Any]:
+    """The engine's clock for a practice exam: the tutor reads the time here and never estimates it."""
+    form = session["format"]
+    started = parse_moment(session["started_at"])
+    ended = _safe_moment(session.get("ended_at"))
+    elapsed = max(0, int(((ended or moment) - started).total_seconds()))
+    running = session.get("status") == "active"
+    texts = {turn["task"]: turn for turn in session.get("utterances", [])}
+    tasks = [{"number": task["number"], "type": task["type"], "words_label": task.get("words_label"),
+              "words_expected": task.get("words"), "submitted": task["number"] in texts,
+              "words": texts[task["number"]]["words"] if task["number"] in texts else None,
+              "late": bool(texts[task["number"]].get("late")) if task["number"] in texts else False}
+             for task in form["tasks"]]
+    return {
+        "session_id": session["id"], "exam": session["exam"], "title": form["title"], "part": form["part"],
+        "status": session.get("status"), "elapsed_seconds": elapsed, "target_seconds": session["target_seconds"],
+        "remaining_seconds": max(0, session["target_seconds"] - elapsed) if running else 0,
+        "time_is_up": running and elapsed >= session["target_seconds"],
+        "started_at_local": local_iso(session["started_at"]), "deadline_local": local_iso(session["deadline_at"]),
+        "ended_at_local": local_iso(session.get("ended_at")), "support": session.get("support", "none"),
+        "tasks": tasks, "open_tasks": [task["number"] for task in tasks if not task["submitted"]],
+    }
+
+
+def exam_result(session: dict[str, Any]) -> dict[str, Any]:
+    """Points from the frozen rubric and the facts the engine measured itself: time, length, and help."""
+    form = session["format"]
+    texts = {turn["task"]: turn for turn in session.get("utterances", [])}
+    scores = session.get("scores") or {}
+    tasks = []
+    for task in form["tasks"]:
+        number = task["number"]
+        turn, score = texts.get(number), scores.get(str(number))
+        expected = task.get("words")
+        tasks.append({
+            "number": number, "type": task["type"], "words_label": task.get("words_label"), "words_expected": expected,
+            "submitted": turn is not None, "words": turn["words"] if turn else 0,
+            "short": bool(turn and expected and turn["words"] < expected * (
+                1 if task.get("words_kind") == "minimum" else EXAM_SHORT_TEXT_SHARE)),
+            "late": bool(turn and turn.get("late")), "turn_id": turn["id"] if turn else None,
+            "bands": score["bands"] if score else None, "points": score["points"] if score else 0,
+            "max_points": max_task_points(form, number), "rule": score.get("rule") if score else None,
+            "note": score.get("note") if score else None,
+        })
+    points = _number(sum(task["points"] for task in tasks))
+    maximum = form["max_points"]
+    percent = int(100 * points / maximum + 0.5) if maximum else 0
+    within_time = not any(task["late"] for task in tasks)
+    unaided = session.get("support", "none") == "none"
+    complete = all(task["submitted"] for task in tasks)
+    pass_mark = form.get("pass") or {}
+    return {
+        "exam": session["exam"], "title": form["title"], "part": form["part"], "tasks": tasks,
+        "points": points, "max_points": maximum, "percent": percent,
+        "pass_percent": pass_mark.get("percent"), "pass_label": pass_mark.get("label"), "pass_note": pass_mark.get("note"),
+        "reached_pass_mark": percent >= pass_mark["percent"] if pass_mark.get("percent") is not None else None,
+        "within_time": within_time, "unaided": unaided, "complete": complete,
+        "exam_conditions": within_time and unaided and complete,
+        "support": session.get("support", "none"), "duration_seconds": session.get("duration_seconds"),
+        "target_seconds": session["target_seconds"],
+        "basis": "Practice estimate by the tutor against the published criteria; not an official result or a prediction.",
+    }
+
+
+def exam_row(session: dict[str, Any]) -> dict[str, Any]:
+    result = session.get("result") or exam_result(session)
+    return {"session_id": session["id"], "exam": session["exam"], "title": result["title"], "part": result["part"],
+            "started_at_local": local_iso(session["started_at"]), "finished_at_local": local_iso(session.get("finished_at")),
+            "points": result["points"], "max_points": result["max_points"], "percent": result["percent"],
+            "reached_pass_mark": result["reached_pass_mark"], "exam_conditions": result["exam_conditions"],
+            "within_time": result["within_time"], "unaided": result["unaided"], "complete": result["complete"]}
 
 
 def _event_moments(
@@ -1381,7 +1481,9 @@ class StateStore:
         if session_id:
             session = self._require_session(self._session_document(), session_id)
             if session.get("status") != "debriefing":
-                raise DeutschLoopError("Stop the scene before recording feedback; only debriefing sessions accept corrections")
+                raise DeutschLoopError(
+                    "Stop the exam before recording feedback; a finished or running exam accepts no corrections" if is_exam(session)
+                    else "Stop the scene before recording feedback; only debriefing sessions accept corrections")
             turn = next((item for item in session.get("utterances", []) if item["id"] == turn_id), None)
             if not turn or turn["speaker"] != "learner" or original.strip() not in turn["text"]:
                 raise DeutschLoopError("The original must be an actual sentence from the referenced learner turn")
@@ -2156,10 +2258,16 @@ class StateStore:
             {**view(item), "due": item["id"] in due_ids, "came_back": item["id"] in recurring_ids}
             for item in ranked[:BOARD_ROWS]
         ]
-        open_scenes = [session for session in sessions if session.get("status") in {"active", "debriefing"}]
+        scenes = [session for session in sessions if not is_exam(session)]
+        open_scenes = [session for session in scenes if session.get("status") in {"active", "debriefing"}]
         active_scene = max(open_scenes, key=lambda session: session.get("started_at", "")) if open_scenes else None
-        completed_scenes = [session for session in sessions if session.get("status") == "complete"]
+        completed_scenes = [session for session in scenes if session.get("status") == "complete"]
         last_scene = max(completed_scenes, key=lambda session: session.get("ended_at") or session.get("started_at", "")) if completed_scenes else None
+        exams = [session for session in sessions if is_exam(session)]
+        open_exams = [session for session in exams if session.get("status") in {"active", "debriefing"}]
+        open_exam = max(open_exams, key=lambda session: session["started_at"]) if open_exams else None
+        finished_exams = [session for session in exams if session.get("status") == "complete"]
+        last_exam = max(finished_exams, key=lambda session: session["started_at"]) if finished_exams else None
         result = {
             "as_of": iso(moment),
             "window_days": window,
@@ -2173,6 +2281,12 @@ class StateStore:
             "last_roleplay": {"session_id": last_scene["id"], "scenario": last_scene["scenario"],
                               "ended_at_local": local_iso(last_scene.get("ended_at")),
                               "next_action": "present_debrief"} if last_scene else None,
+            "active_exam": {**exam_timing(open_exam, moment),
+                            "next_action": "wait_for_texts" if open_exam["status"] == "active" else "prepare_report"}
+                           if open_exam else None,
+            "last_exam": {**exam_row(last_exam), "next_action": "present_report"} if last_exam else None,
+            "exams": {"count": sum(in_window(session.get("started_at")) for session in finished_exams),
+                      "total": len(finished_exams)},
             "last_activity_at": iso(last) if last else None,
             "last_activity_local": to_local(last).isoformat() if last else None,
             "days_since_last_activity": (local_date(moment) - local_date(last)).days if last else None,
@@ -2269,7 +2383,8 @@ class StateStore:
             return {"status": "resume", **pending, "mission": view, "next_action": view["next_action"]}
         unfinished = [item for item in sessions if item.get("status") in {"active", "debriefing"}]
         if unfinished:
-            raise DeutschLoopError(f"Finish or resume scene {unfinished[-1]['id']} before starting a mission scene")
+            kind = "practice exam" if is_exam(unfinished[-1]) else "scene"
+            raise DeutschLoopError(f"Finish or resume {kind} {unfinished[-1]['id']} before starting a mission scene")
         attempts = mission.get("attempts") or []
         last = attempts[-1] if attempts else None
         previous_scene = next((item for item in sessions if last and item["id"] == last["session_id"]), None)
@@ -2472,7 +2587,7 @@ class StateStore:
             raise DeutschLoopError("Only a partner turn can record hint/shown support")
         moment = at or utc_now()
         document = self._session_document()
-        session = self._require_session(document, identifier)
+        session = self._require_scene(document, identifier)
         utterances = session.get("utterances", [])
         retry = next((turn for turn in utterances if event_id and turn.get("event_id") == event_id), None)
         if retry:
@@ -2502,7 +2617,7 @@ class StateStore:
         """Freeze scene duration before the tutor spends time on the debrief."""
         moment = at or utc_now()
         document = self._session_document()
-        session = self._require_session(document, identifier)
+        session = self._require_scene(document, identifier)
         if session.get("status") != "active":
             return session
         latest_at = (session.get("utterances") or [{"at": session["started_at"]}])[-1]["at"]
@@ -2518,7 +2633,7 @@ class StateStore:
         self, identifier: str, *, term: str, meaning: str, turn_id: str, surface: str | None = None,
     ) -> dict[str, Any]:
         document = self._session_document()
-        session = self._require_session(document, identifier)
+        session = self._require_scene(document, identifier)
         if session.get("status") != "debriefing":
             raise DeutschLoopError("Vocabulary is collected in the debrief after stopping the scene")
         turn = next((item for item in session.get("utterances", []) if item["id"] == turn_id), None)
@@ -2668,7 +2783,7 @@ class StateStore:
         return word
 
     def roleplay_show(self, identifier: str, *, at: datetime | None = None) -> dict[str, Any]:
-        session = self._require_session(self._session_document(), identifier)
+        session = self._require_scene(self._session_document(), identifier)
         result = {"session": session, **session_timing(session, at or utc_now())}
         result["debrief"] = session_debrief(
             session, self._mistake_document()["mistakes"], self._vocabulary_document()["words"]
@@ -2695,7 +2810,7 @@ class StateStore:
     ) -> dict[str, Any]:
         moment = at or utc_now()
         document = self._session_document()
-        session = self._require_session(document, identifier)
+        session = self._require_scene(document, identifier)
         if session.get("status") == "complete":
             return session
         ended = _safe_moment(session.get("ended_at")) or moment
@@ -2733,6 +2848,238 @@ class StateStore:
         )
         _atomic_write(self.sessions_path, document)
         return session
+
+    # ---- practice exams
+
+    @staticmethod
+    def _require_scene(document: dict[str, Any], identifier: str) -> dict[str, Any]:
+        session = StateStore._require_session(document, identifier)
+        if is_exam(session):
+            raise DeutschLoopError(f"{identifier} is a practice exam; use exam-submit, exam-stop, exam-score, and exam-finish")
+        return session
+
+    @staticmethod
+    def _require_exam(document: dict[str, Any], identifier: str) -> dict[str, Any]:
+        session = StateStore._require_session(document, identifier)
+        if not is_exam(session):
+            raise DeutschLoopError(f"{identifier} is a roleplay scene, not a practice exam")
+        return session
+
+    def exam_start(self, exam: str, *, tasks: list[str], at: datetime | None = None) -> dict[str, Any]:
+        """Save the tutor's new tasks and start the clock; the rubric is frozen into the session."""
+        key = resolve_exam(exam)
+        if key is None:
+            raise DeutschLoopError(f"Unknown exam '{exam}'. Choose from: {', '.join(sorted(EXAMS))}")
+        form = exam_snapshot(key)
+        prompts = [text.strip() for text in tasks]
+        if len(prompts) != len(form["tasks"]) or not all(prompts):
+            raise DeutschLoopError(
+                f"{form['title']} has {len(form['tasks'])} writing task(s); pass one --task text for each, in order")
+        moment = at or utc_now()
+        document = self._session_document()
+        unfinished = next((item for item in document["sessions"] if item.get("status") in {"active", "debriefing"}), None)
+        if unfinished:
+            kind = "practice exam" if is_exam(unfinished) else "scene"
+            raise DeutschLoopError(f"Finish or resume {kind} {unfinished['id']} before starting a practice exam")
+        fingerprints = [text_fingerprint(prompt) for prompt in prompts]
+        used = {mark for item in document["sessions"] if is_exam(item) for mark in item.get("task_fingerprints", [])}
+        if len(set(fingerprints)) != len(fingerprints) or used.intersection(fingerprints):
+            raise DeutschLoopError("This exam task was already used; write a new task")
+        for task, prompt in zip(form["tasks"], prompts):
+            task["prompt"] = prompt
+        session = {
+            "id": f"s_{uuid.uuid4().hex[:12]}", "type": "exam", "scenario": EXAM_SCENARIO, "exam": key, "format": form,
+            "task_fingerprints": fingerprints, "input_mode": "text", "status": "active", "support": "none",
+            "started_at": iso(moment), "deadline_at": iso(moment + timedelta(minutes=form["minutes"])), "ended_at": None,
+            "target_seconds": form["minutes"] * 60, "utterances": [], "feedback": [], "vocabulary": [], "scores": {},
+            "known_pattern_ids": [item["id"] for item in self._mistake_document()["mistakes"]],
+            "turns": None, "duration_seconds": None, "mistake_ids": [], "notes": None,
+        }
+        document["sessions"].append(session)
+        _atomic_write(self.sessions_path, document)
+        return {**self.exam_show(session["id"], at=moment), "status": "started"}
+
+    def exam_submit(self, identifier: str, *, task: int, text: str, support: str = "none",
+                    at: datetime | None = None) -> dict[str, Any]:
+        """Store the learner's text for one task. A newer text replaces it until the exam is stopped."""
+        if support not in EXAM_SUPPORT_RANK:
+            raise DeutschLoopError("support must be none, hint, or shown")
+        text = text.strip()
+        if not text:
+            raise DeutschLoopError("Submit the learner's actual text")
+        moment = at or utc_now()
+        document = self._session_document()
+        session = self._require_exam(document, identifier)
+        form = session["format"]
+        if task not in {item["number"] for item in form["tasks"]}:
+            raise DeutschLoopError(f"{form['title']} has no writing task {task}")
+        turn = next((item for item in session["utterances"] if item["task"] == task), None)
+        helped = EXAM_SUPPORT_RANK[support] > EXAM_SUPPORT_RANK[session.get("support", "none")]
+        if turn and turn["text"] == text and not helped:
+            return {**self.exam_show(identifier, at=moment), "status": "duplicate", "utterance": turn}
+        if session.get("status") != "active":
+            raise DeutschLoopError("This practice exam is closed; its texts are final")
+        latest = max([parse_moment(session["started_at"])] + [parse_moment(item["at"]) for item in session["utterances"]])
+        if moment < latest:
+            raise DeutschLoopError("A text cannot precede the exam or an earlier text")
+        if turn is None or turn["text"] != text:
+            deadline = parse_moment(session["deadline_at"]) + timedelta(seconds=EXAM_GRACE_SECONDS)
+            entry = {"speaker": "learner", "task": task, "text": text, "at": iso(moment), "event_id": None,
+                     "words": count_words(text), "late": moment > deadline}
+            if turn is None:
+                turn = {"id": f"t_{uuid.uuid4().hex[:12]}", **entry}
+                session["utterances"].append(turn)
+                status = "stored"
+            else:
+                turn.update(entry, revisions=int(turn.get("revisions", 0)) + 1)
+                status = "replaced"
+        else:
+            status = "stored"
+        if helped:
+            session["support"] = support
+        _atomic_write(self.sessions_path, document)
+        return {**self.exam_show(identifier, at=moment), "status": status, "utterance": turn}
+
+    def exam_stop(self, identifier: str, *, at: datetime | None = None) -> dict[str, Any]:
+        """Close the exam for writing. It ends with the last text, not with the tutor's bookkeeping after it."""
+        moment = at or utc_now()
+        document = self._session_document()
+        session = self._require_exam(document, identifier)
+        if session.get("status") != "active":
+            return session
+        started = parse_moment(session["started_at"])
+        latest = max((parse_moment(item["at"]) for item in session["utterances"]), default=None)
+        if moment < (latest or started):
+            raise DeutschLoopError("An exam cannot end before it starts or before its last text")
+        ended = latest or moment
+        session.update({"status": "debriefing", "ended_at": iso(ended), "stopped_at": iso(moment),
+                        "duration_seconds": int((ended - started).total_seconds()), "duration_source": "elapsed",
+                        "turns": len(session["utterances"])})
+        _atomic_write(self.sessions_path, document)
+        return session
+
+    def exam_score(self, identifier: str, *, task: int, bands: dict[str, str], note: str,
+                   at: datetime | None = None) -> dict[str, Any]:
+        """Turn the tutor's rating bands into points with the exam's own table and knock-out rules."""
+        moment = at or utc_now()
+        note = (note or "").strip()
+        document = self._session_document()
+        session = self._require_exam(document, identifier)
+        form = session["format"]
+        status = session.get("status")
+        if status == "active":
+            raise DeutschLoopError("Stop the exam before rating it; no feedback reaches the learner while the clock runs")
+        if status != "debriefing":
+            raise DeutschLoopError("This practice exam is closed; its ratings are final")
+        if task not in {item["number"] for item in form["tasks"]}:
+            raise DeutschLoopError(f"{form['title']} has no writing task {task}")
+        turn = next((item for item in session["utterances"] if item["task"] == task), None)
+        if turn is None:
+            raise DeutschLoopError(f"No text was submitted for task {task}; it scores 0 without a rating")
+        if not note:
+            raise DeutschLoopError("A rating needs a --note grounded in the learner's text")
+        try:
+            outcome = score_task(form, task, bands, words=turn["words"])
+        except ValueError as exc:
+            raise DeutschLoopError(str(exc)) from exc
+        entry = {"bands": outcome["bands"], "points": outcome["points"], "rule": outcome["rule"], "note": note, "at": iso(moment)}
+        previous = session["scores"].get(str(task))
+        same = bool(previous) and all(previous.get(field) == entry[field] for field in ("bands", "points", "rule", "note"))
+        if not same:
+            session["scores"][str(task)] = entry
+            _atomic_write(self.sessions_path, document)
+        unscored = sorted(item["task"] for item in session["utterances"] if str(item["task"]) not in session["scores"])
+        return {"status": "duplicate" if same else "rescored" if previous else "scored", "session_id": identifier, "task": task,
+                "score": {**(previous if same else entry), "max_points": max_task_points(form, task)},
+                "unscored_tasks": unscored, "next_action": "score_remaining_tasks" if unscored else "finish_exam"}
+
+    def exam_finish(self, identifier: str, *, at: datetime | None = None) -> dict[str, Any]:
+        moment = at or utc_now()
+        document = self._session_document()
+        session = self._require_exam(document, identifier)
+        if session.get("status") == "complete":
+            return session
+        if session.get("status") != "debriefing":
+            raise DeutschLoopError("Stop the exam before finishing it" if session.get("status") == "active"
+                                   else "A cancelled practice exam has no result")
+        if moment < parse_moment(session["ended_at"]):
+            raise DeutschLoopError("A report cannot be finished before the exam ended")
+        unscored = sorted(item["task"] for item in session["utterances"] if str(item["task"]) not in session["scores"])
+        if unscored:
+            raise DeutschLoopError(
+                f"Rate task {', '.join(str(number) for number in unscored)} with exam-score first; every submitted text needs a rating")
+        linked = [item["mistake_id"] for item in session.get("feedback", [])]
+        session.update({"status": "complete", "finished_at": iso(moment), "mistake_ids": list(dict.fromkeys(linked))})
+        session["result"] = exam_result(session)
+        _atomic_write(self.sessions_path, document)
+        return session
+
+    def exam_cancel(self, identifier: str, *, at: datetime | None = None) -> dict[str, Any]:
+        """Abandon an unfinished exam: it leaves the history, while its tasks stay used and recorded errors stay recorded."""
+        moment = at or utc_now()
+        document = self._session_document()
+        session = self._require_exam(document, identifier)
+        if session.get("status") == "complete":
+            raise DeutschLoopError("A finished practice exam stays in the history")
+        if session.get("status") != "cancelled":
+            session.update({"status": "cancelled", "ended_at": session.get("ended_at") or iso(moment), "cancelled_at": iso(moment)})
+            _atomic_write(self.sessions_path, document)
+        return session
+
+    def exam_show(self, identifier: str, *, at: datetime | None = None) -> dict[str, Any]:
+        moment = at or utc_now()
+        sessions = self._session_document()["sessions"]
+        session = self._require_exam({"sessions": sessions}, identifier)
+        form = session["format"]
+        status = session.get("status")
+        result: dict[str, Any] = {
+            "session": {
+                "id": session["id"], "type": "exam", "exam": session["exam"], "status": status,
+                "tasks": [{field: task.get(field) for field in ("number", "type", "register", "words_label", "content_points", "prompt")}
+                          for task in form["tasks"]],
+                "texts": [{"turn_id": turn["id"], "task": turn["task"], "text": turn["text"], "words": turn["words"],
+                           "late": turn.get("late", False), "at_local": local_iso(turn["at"]), "revisions": turn.get("revisions", 0)}
+                          for turn in session["utterances"]],
+                "scores": session.get("scores") or {},
+            },
+            **exam_timing(session, moment),
+            "rubric": {"criteria": form["criteria"], "bands": form["bands"], "band_labels": form.get("band_labels"),
+                       "points": form["scoring"]["points"],
+                       "rules": [rule["text"] for rule in form["scoring"].get("rules", [])],
+                       "length_floor": form["scoring"].get("length_floor"), "tutor_rules": form.get("tutor_rules", []),
+                       "max_points": form["max_points"], "pass": form.get("pass")},
+            "report": None, "learner_message": None, "response_required": False,
+        }
+        if status == "complete":
+            earlier = [item for item in sessions if is_exam(item) and item.get("status") == "complete"
+                       and item["exam"] == session["exam"] and item["started_at"] < session["started_at"]]
+            groups = _feedback_groups(session, self._mistake_document()["mistakes"])
+            result["report"] = {
+                **(session.get("result") or exam_result(session)),
+                "confirmed_patterns": len(groups), "confirmed_occurrences": sum(item["session_occurrences"] for item in groups),
+                "corrections": groups[:EXAM_CORRECTION_ROWS],
+                "previous": exam_row(max(earlier, key=lambda item: item["started_at"])) if earlier else None,
+            }
+            # As with a scene's debrief, saving a report is not showing it: hand the agent ready text.
+            result["learner_message"] = render_exam_text(result)
+            result["response_required"] = True
+        result["next_action"] = {"active": "wait_for_texts", "debriefing": "prepare_report", "complete": "present_report",
+                                 "cancelled": "exam_cancelled"}[status]
+        if status == "active":
+            result["card"] = render_exam_card(result)
+            result["conduct"] = ("Show the card and the task texts, then wait. Until exam-stop: no hints, corrections, "
+                                 "vocabulary, or comments on the text. Take the time only from this output.")
+        return result
+
+    def exam_list(self, *, exam: str | None = None) -> list[dict[str, Any]]:
+        key = None
+        if exam:
+            key = resolve_exam(exam)
+            if key is None:
+                raise DeutschLoopError(f"Unknown exam '{exam}'. Choose from: {', '.join(sorted(EXAMS))}")
+        sessions = [item for item in self._session_document()["sessions"]
+                    if is_exam(item) and item.get("status") == "complete" and (key is None or item["exam"] == key)]
+        return [exam_row(item) for item in sorted(sessions, key=lambda item: item["started_at"])]
 
 
 # --------------------------------------------------------------------------- correction analysis
@@ -3243,6 +3590,124 @@ def render_vocab_due_text(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _clock(seconds: int) -> str:
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def _points(value: float) -> str:
+    return str(_number(value)).replace(".", ",")
+
+
+def _local_day(stamp: str | None) -> str:
+    return f"{stamp[8:10]}.{stamp[5:7]}.{stamp[:4]}" if stamp else "?"
+
+
+def _exam_conditions(row: dict[str, Any]) -> list[str]:
+    """What kept a result from being written under exam conditions; empty when nothing did."""
+    return [text for holds, text in ((row["unaided"], "mit Hilfe"), (row["within_time"], "nach der Zeit"),
+                                     (row["complete"], "unvollständig")) if not holds]
+
+
+def render_exam_card(result: dict[str, Any]) -> str:
+    """What the learner sees when the clock starts; the tutor adds the task texts below it."""
+    lines = [f"PRÜFUNGSTRAINING · {result['title']} · {result['part']}",
+             f"Zeit: {result['target_seconds'] // 60} Minuten · Abgabe bis {(result['deadline_local'] or '')[11:16]} Uhr"]
+    for task in result["tasks"]:
+        lines.append(" · ".join(part for part in (f"Aufgabe {task['number']}", task["type"], task.get("words_label")) if part))
+    lines.append("Bis zur Abgabe gibt es keine Hilfe und keine Korrekturen. Mit „Abgeben“ endet die Prüfung.")
+    return "\n".join(lines)
+
+
+def render_exam_text(result: dict[str, Any]) -> str:
+    report = result.get("report")
+    if not report:
+        status = result["session"]["status"]
+        if status == "debriefing":
+            return "Die Prüfung ist abgegeben. Die Auswertung wird vorbereitet."
+        if status == "cancelled":
+            return "Diese Prüfung wurde abgebrochen und zählt nicht."
+        deadline = (result.get("deadline_local") or "")[11:16]
+        if result.get("time_is_up"):
+            return f"Die Zeit ist um: Abgabe war um {deadline} Uhr."
+        return f"Die Prüfung läuft. Abgabe bis {deadline} Uhr, noch {_clock(result['remaining_seconds'])} Minuten."
+    labels = {item["id"]: item["label"] for item in result["rubric"]["criteria"]}
+    used = report.get("duration_seconds")
+    time_line = f"Zeit: {_clock(used) if used is not None else '?'} von {_clock(report['target_seconds'])}"
+    lines = ["PRÜFUNGSTRAINING · AUSWERTUNG",
+             f"{report['title']} · {report['part']} · {_local_day(result.get('started_at_local'))}",
+             f"{time_line} · {'ohne Hilfe' if report['unaided'] else 'mit Hilfe'}", ""]
+    for task in report["tasks"]:
+        head = f"Aufgabe {task['number']} · {task['type']}"
+        score = f"{_points(task['points'])} von {_points(task['max_points'])} Punkten"
+        if not task["submitted"]:
+            lines.append(f"{head} · nicht abgegeben  →  {score}")
+            continue
+        length = f"{task['words']} Wörter" + (f" ({task['words_label']})" if task.get("words_label") else "")
+        lines.append(f"{head} · {length}")
+        bands = " · ".join(f"{label} {task['bands'][key]}" for key, label in labels.items() if key in task["bands"])
+        lines.append(f"  {bands}  →  {score}")
+        if task.get("rule"):
+            lines.append(f"  Regel: {task['rule']}")
+        if task.get("note"):
+            lines.append(f"  {task['note']}")
+    lines.extend(["", f"Übungsergebnis: {_points(report['points'])} von {_points(report['max_points'])} Punkten ({report['percent']} %)"])
+    if report.get("pass_percent") is not None:
+        reached = "erreicht" if report["reached_pass_mark"] else "nicht erreicht"
+        lines.append(f"{report['pass_label']}: {report['pass_percent']} % · {reached}")
+    if report.get("pass_note"):
+        lines.append(report["pass_note"])
+    lines.append("Das ist eine Übungseinschätzung nach den veröffentlichten Kriterien, kein offizielles Ergebnis.")
+    late = [str(task["number"]) for task in report["tasks"] if task["late"]]
+    short = [f"Aufgabe {task['number']} ({task['words']} von {task['words_label'] or task['words_expected']})"
+             for task in report["tasks"] if task["short"]]
+    flags = []
+    if late:
+        flags.append(f"Nach der Zeit abgegeben: Aufgabe {', '.join(late)}. In der Prüfung zählt nur, was bis zur Abgabe geschrieben ist.")
+    if not report["unaided"]:
+        flags.append("Mit Hilfe geschrieben: Dieses Ergebnis zeigt nicht, was du in der Prüfung allein schaffst.")
+    if short:
+        flags.append(f"Kürzer als verlangt: {', '.join(short)}.")
+    if flags:
+        lines.extend(["", *flags])
+    lines.append("")
+    corrections = report["corrections"]
+    if corrections:
+        lines.append(f"Fehler aus deinen Texten: {_plural(report['confirmed_patterns'], 'Muster', 'Muster')}")
+        for index, item in enumerate(corrections, 1):
+            known = " · schon bekannt" if item["previously_tracked"] else ""
+            count = f" · {item['session_occurrences']}× in dieser Prüfung" if item["session_occurrences"] > 1 else ""
+            lines.extend([f"{index}. {item['label']}{known}{count}", f"   {item['example']['original']}",
+                          f"   → {item['example']['corrected']}"])
+        more = report["confirmed_patterns"] - len(corrections)
+        if more > 0:
+            lines.append(f"+{more} weitere")
+        lines.append("Diese Muster kommen in deiner Wiederholung in neuen Sätzen zurück.")
+    else:
+        lines.append("Keine bestätigten Fehler für diese Prüfung gespeichert.")
+    previous = report.get("previous")
+    if previous:
+        note = _exam_conditions(previous)
+        lines.extend(["", f"Letzter Versuch ({_local_day(previous['started_at_local'])}): "
+                          f"{_points(previous['points'])} von {_points(previous['max_points'])} Punkten"
+                          f"{' (' + ', '.join(note) + ')' if note else ''} · heute: {_points(report['points'])}"])
+    return "\n".join(lines)
+
+
+def render_exam_list_text(result: dict[str, Any]) -> str:
+    rows = result["exams"]
+    if not rows:
+        return "Noch kein Prüfungstraining abgeschlossen."
+    lines = [f"Prüfungstraining · {_plural(len(rows), 'Versuch', 'Versuche')}"]
+    names = [f"{row['title']} · {row['part']}" for row in rows]
+    width = max(len(name) for name in names)
+    for row, name in zip(rows, names):
+        note = _exam_conditions(row)
+        lines.append(f"{_local_day(row['started_at_local'])}  {name:<{width}}  "
+                     f"{_points(row['points'])} von {_points(row['max_points'])} ({row['percent']} %)"
+                     f"{' · ' + ', '.join(note) if note else ''}")
+    return "\n".join(lines)
+
+
 TEXT_RENDERERS: dict[str, Callable[[dict[str, Any]], str]] = {
     "summary": render_summary_text,
     "recap": render_recap_text,
@@ -3253,6 +3718,9 @@ TEXT_RENDERERS: dict[str, Callable[[dict[str, Any]], str]] = {
     "roleplay-finish": render_roleplay_text,
     "vocab-list": render_vocab_list_text,
     "vocab-due": render_vocab_due_text,
+    "exam-show": render_exam_text,
+    "exam-finish": render_exam_text,
+    "exam-list": render_exam_list_text,
 }
 CARD_RENDERERS: dict[str, Callable[[dict[str, Any]], str]] = {"recap": render_recap_card}
 
@@ -3625,7 +4093,62 @@ def build_parser() -> argparse.ArgumentParser:
     roleplay_finish_parser.add_argument("--notes")
     roleplay_finish_parser.add_argument("--at", help="ISO-8601 finish time")
     _add_format(roleplay_finish_parser)
+
+    subparsers.add_parser("exam-formats", help="List practice-exam formats: tasks, criteria, point tables, and sources")
+    exam_start_parser = subparsers.add_parser("exam-start", help="Start a timed practice exam (writing part) with new tasks")
+    exam_start_parser.add_argument("--exam", required=True, help="Format ID or alias from exam-formats, e.g. goethe-b1")
+    exam_start_parser.add_argument("--task", action="append", required=True,
+                                   help="The full text of one new task; repeat once per task of the format, in order")
+    exam_start_parser.add_argument("--at", help="ISO-8601 start time")
+    exam_submit_parser = subparsers.add_parser("exam-submit", help="Store the learner's text for one exam task")
+    exam_submit_parser.add_argument("session_id")
+    exam_submit_parser.add_argument("--task", type=int, required=True)
+    exam_text = exam_submit_parser.add_mutually_exclusive_group(required=True)
+    exam_text.add_argument("--text", help="The learner's text, verbatim")
+    exam_text.add_argument("--text-file", help="UTF-8 file holding the learner's text, for long texts or texts with quotation marks")
+    exam_submit_parser.add_argument("--support", choices=("none", "hint", "shown"), default="none",
+                                    help="Help the learner actually received while writing")
+    exam_submit_parser.add_argument("--at")
+    exam_score_parser = subparsers.add_parser("exam-score", help="Rate one submitted task by the exam's criteria; the engine computes points")
+    exam_score_parser.add_argument("session_id")
+    exam_score_parser.add_argument("--task", type=int, required=True)
+    exam_score_parser.add_argument("--band", action="append", required=True, metavar="CRITERION=BAND",
+                                   help="One rating per criterion, e.g. --band erfuellung=B; repeat for every criterion")
+    exam_score_parser.add_argument("--note", required=True, help="Grounded reasons that cite the learner's text; shown in the report")
+    exam_score_parser.add_argument("--at")
+    for name, help_text in (("exam-stop", "Close the exam for writing and freeze its time before feedback"),
+                            ("exam-finish", "Complete a rated exam and return its report"),
+                            ("exam-cancel", "Abandon an unfinished exam; it leaves the history"),
+                            ("exam-show", "Inspect an exam: clock, texts, rubric, or the finished report")):
+        exam_parser = subparsers.add_parser(name, help=help_text)
+        exam_parser.add_argument("session_id")
+        exam_parser.add_argument("--at")
+        if name in {"exam-finish", "exam-show"}:
+            _add_format(exam_parser)
+    exam_list_parser = subparsers.add_parser("exam-list", help="Finished practice exams, oldest first")
+    exam_list_parser.add_argument("--exam", help="Only this format")
+    _add_format(exam_list_parser)
     return parser
+
+
+def _exam_bands(values: list[str]) -> dict[str, str]:
+    bands: dict[str, str] = {}
+    for value in values:
+        criterion, separator, band = value.partition("=")
+        criterion, band = criterion.strip().lower(), band.strip().upper()
+        if not separator or not criterion or not band or criterion in bands:
+            raise DeutschLoopError("Pass each rating once as --band criterion=BAND, e.g. --band erfuellung=B")
+        bands[criterion] = band
+    return bands
+
+
+def _exam_text(arguments: argparse.Namespace) -> str:
+    if arguments.text is not None:
+        return arguments.text
+    try:
+        return Path(arguments.text_file).expanduser().read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise DeutschLoopError(f"Could not read the text file {arguments.text_file}: {exc}") from exc
 
 
 def mistake_view(mistake: dict[str, Any], verbose: bool) -> dict[str, Any]:
@@ -3637,6 +4160,9 @@ def run(arguments: argparse.Namespace) -> dict[str, Any]:
     store = StateStore(default_home(arguments.home))
     if arguments.command == "scenarios":
         return {"count": len(SCENARIOS), "scenarios": scenario_examples(), "aliases": SCENARIO_ALIASES}
+    if arguments.command == "exam-formats":
+        return {"count": len(EXAMS), "exams": exam_formats(),
+                "basis": "Practice estimates against published criteria; never an official result."}
     if arguments.command == "dashboard" and not store.home.exists():
         return _run_locked(store, arguments)  # An empty export must not create learner memory.
     with state_lock(store.home):
@@ -3827,6 +4353,25 @@ def _run_locked(store: StateStore, arguments: argparse.Namespace) -> dict[str, A
             at=parse_moment(arguments.at),
         )
         return {"status": "finished", **store.roleplay_show(session["id"])}
+    if command == "exam-start":
+        return store.exam_start(arguments.exam, tasks=arguments.task, at=parse_moment(arguments.at))
+    if command == "exam-submit":
+        return store.exam_submit(arguments.session_id, task=arguments.task, text=_exam_text(arguments),
+                                 support=arguments.support, at=parse_moment(arguments.at))
+    if command == "exam-score":
+        return store.exam_score(arguments.session_id, task=arguments.task, bands=_exam_bands(arguments.band),
+                                note=arguments.note, at=parse_moment(arguments.at))
+    if command in {"exam-stop", "exam-finish", "exam-cancel"}:
+        moment = parse_moment(arguments.at)
+        action = {"exam-stop": store.exam_stop, "exam-finish": store.exam_finish, "exam-cancel": store.exam_cancel}[command]
+        action(arguments.session_id, at=moment)
+        status = {"exam-stop": "stopped", "exam-finish": "finished", "exam-cancel": "cancelled"}[command]
+        return {**store.exam_show(arguments.session_id, at=moment), "status": status}
+    if command == "exam-show":
+        return store.exam_show(arguments.session_id, at=parse_moment(arguments.at))
+    if command == "exam-list":
+        rows = store.exam_list(exam=arguments.exam)
+        return {"count": len(rows), "exams": rows}
     raise DeutschLoopError(f"Unsupported command: {command}")
 
 

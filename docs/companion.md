@@ -160,6 +160,22 @@ Kellner: Kein Problem, lassen Sie sich Zeit. Ein kleiner Tipp: Beim Bestellen be
 
 The companion watches the tutor's next `roleplay-turn` for the partner and adds `--support hint` when the tutor left the flag out; a turn the tutor marked `--support shown` keeps its mark. Help therefore always counts as help: a mission step answered after it cannot be recorded as achieved without help.
 
+## The exam clock
+
+When the tutor starts a [practice exam](exams.md), its clock opens as a pane; `/pruefung` opens it by hand:
+
+```text
+Goethe-Zertifikat B1 · Schreiben
+Zeit: 19:04 / 60:00  ███░░░░░░░
+Noch 40:56 · Abgabe bis 16:00 Uhr
+Aufgabe 1 · Persönliche E-Mail · circa 80 Wörter: abgegeben, 74 Wörter
+Aufgabe 2 · Forumsbeitrag mit eigener Meinung · circa 80 Wörter: offen
+Aufgabe 3 · Kurze höfliche E-Mail · circa 40 Wörter: offen
+Bis zur Abgabe gibt es keine Hilfe und keine Korrekturen. Mit „Abgeben“ endet die Prüfung.
+```
+
+The time, the deadline, and the word counts are the engine's; the pane reads them after each of the tutor's exam commands and runs none itself. There is no Hilfe button here, because the exam gives no help. No Nochmal card opens while an exam runs. The pane closes 20 seconds after the hand-in, and the report comes in the chat. The pane shows the companion's layout with example values.
+
 ## Models and privacy
 
 - **Model calls:** writing a card and checking an answer each take one Sonnet call through your own Claude Code login. The status line and the panes make no model calls.

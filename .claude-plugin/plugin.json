@@ -1,7 +1,7 @@
 {
   "name": "deutsch-loop",
   "displayName": "DeutschLoop",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A German tutor that remembers your mistakes, brings each one back in a new sentence, and keeps the hint that helped. Local memory, no API key.",
   "author": {
     "name": "Ahmet Sahin",

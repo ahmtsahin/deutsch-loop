@@ -1,9 +1,9 @@
 ---
 name: deutsch-loop
-description: Coach German writing and conversation with minimal corrections, persistent root-cause mistake tracking (FehlerDNA), mistake-based spaced repetition with a new sentence every time, roleplay whose words return in spaced reviews, continuing preparation for real-life goals across sessions, and an honest progress profile. Use for German correction, personalized review, vocabulary, progress, roleplay, or preparation for an interview, presentation, appointment, or other concrete event; do not use for translation-only requests without learning or feedback.
+description: Coach German writing and conversation with minimal corrections, persistent root-cause mistake tracking (FehlerDNA), mistake-based spaced repetition with a new sentence every time, roleplay whose words return in spaced reviews, continuing preparation for real-life goals across sessions, timed practice for the writing part of Goethe, telc, and DTZ exams rated with each exam's own scheme, and an honest progress profile. Use for German correction, personalized review, vocabulary, progress, roleplay, exam writing practice, or preparation for an interview, presentation, appointment, or other concrete event; do not use for translation-only requests without learning or feedback.
 license: MIT
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
 ---
 
 # DeutschLoop
@@ -57,6 +57,7 @@ Ich bin dein Deutsch-Tutor mit Gedächtnis. Ich merke mir jeden Fehler und bring
 · Rollenspiel: „Rollenspiel Restaurant", „Rollenspiel Arzt", „Rollenspiel Arbeit", „Rollenspiel Wohnung" oder „Rollenspiel Alltag".
 · Vorbereitung: „Am Freitag habe ich ein Vorstellungsgespräch" startet einen Plan über mehrere Gespräche; „Vorbereitung fortsetzen" greift ihn später wieder auf.
 · Sprechen: „speak restaurant" startet eine kurze Szene. Korrekturen und Wortschatz kommen erst danach.
+· Prüfungstraining: „Goethe B1 Schreiben üben" startet den Schreibteil mit Uhr und mit den Punkten der echten Prüfung (Goethe B1/B2, telc B1/B2, DTZ).
 · Fortschritt: „Wie stehe ich?" zeigt deine FehlerDNA.
 · Einspruch: „Das war kein Fehler" nimmt eine Korrektur zurück.
 · Gemeinsam lernen: „Gib mir einen Hinweis" lässt dich selbst korrigieren. Ich merke mir, welche Hilfe funktioniert hat.
@@ -73,6 +74,8 @@ python <skill-root>/scripts/deutsch_loop.py recap
 Use `onboarding.stage` to route a new or interrupted first encounter; see **First session**. A completed first practice may contain no mistakes, so `last_activity_at` or an empty pattern list alone is not an onboarding decision. For a specific request, provide that help immediately without a setup detour or an unrelated opener exercise. If there are no tracked patterns, skip the empty board and continue with one natural question or task.
 
 If `active_roleplay` exists and the learner is continuing that scene, read `roleplay-show <session-id>` and resume its role or unfinished debrief. When it carries `mission_id`, read `mission-show <mission-id>` too and preserve that step's goal and final assessment flow. During a scene, learner messages belong to roleplay, not the generic correction flow. An explicit new request takes precedence.
+
+If `active_exam` exists, a practice exam is open: its clock is still running, or its report is still owed. Unless the learner asks for something else, read `exam-show <session-id>` and continue as [practice exams](references/exams.md) describes.
 
 If `recap.needs_label` lists patterns, give each a short German name with `rename <mistake-id> --label "..."` and run `recap` again. Otherwise open in this order, with the explanation language available when needed:
 
@@ -128,6 +131,7 @@ Read [references/onboarding.md](references/onboarding.md) for a learner who cann
 - A clear end request in a roleplay: **Ending a scene includes showing the debrief**, before routing to any other mode.
 - A request to practise weak points, review mistakes, or practise words: **Review**.
 - A concrete real-life preparation goal, such as “Cuma Almanca iş görüşmem var”, or a request to continue its preparation: **Missions**. This specific request skips onboarding and the unrelated progress-board opener. A fictional statement during a roleplay is not a new real-life goal.
+- A request to practise the writing part of a German exam (Goethe, telc, DTZ), or a text sent while one is running: **Practice exams**. This skips onboarding and the progress-board opener.
 - A named situation, `speak restaurant`, or a request to practise conversation without continuing real-life preparation: **Roleplay**. Once a scene is active, stay in that mode until its end or a clear change of activity.
 - A progress question: **Progress**.
 - A question about what you can do („Was kannst du?", „Hilfe", “Neler yapabiliriz?”, “help”): **Help on request**.
@@ -256,6 +260,16 @@ At a scene's end, follow the normal stop → feedback → finish flow, then `mis
 
 `recap.missions` and `mission-show` persist the current step across chats. `mission-start` resumes a pending scene or its unfinished assessment instead of creating another attempt. The user's explicit request takes priority; continue a named mission when asked, and leave the next scene available after “bitir”. Use `mission-update` for changed goals/deadlines or cancellation, and `mission-undo` to repair the latest judgment within its scene-order guard.
 
+## Practice exams
+
+Read [references/exams.md](references/exams.md) before the first exam in a conversation. `exam-formats` lists the five writing-part formats (`goethe-b1`, `goethe-b2`, `telc-b1`, `telc-b2`, `dtz`) with their tasks, criteria, point tables, and sources. Write a new task for each task of the format, then start the clock and show the returned `card` and your tasks in the same response:
+
+```text
+python <skill-root>/scripts/deutsch_loop.py exam-start --exam goethe-b1 --task '...' --task '...' --task '...'
+```
+
+While the clock runs, store every text with `exam-submit` and say nothing about it: no hint, correction, or vocabulary. Take the time left only from the command's output. After the hand-in: `exam-stop`, then `record` each confirmed error with `--session-id` and the text's `--turn-id`, rate every submitted task with `exam-score`, and close with `exam-finish`. Put its `learner_message` in the final response; running the command does not show the report. The engine counts the words, computes the points from the exam's table, and applies the exam's knock-out rules; you choose the rating bands and give a grounded reason.
+
 ## Repair
 
 If the learner disputes something you just recorded, graded, observed, merged, or logged with `coach` and they are right, apologize in one sentence and revert only that change:
@@ -272,7 +286,7 @@ For words, find the ID with `vocab-list`. `vocab-undo <word-id>` reverts that wo
 
 ## Confidence boundary
 
-No tool checks your corrections; they are your own judgment. When you are not sure, say so and offer the change as a suggestion instead of recording it. Never invent CLI output, dates, times, or counts, and never make a CEFR or exam claim. Profile percentages describe accuracy on tracked patterns only, not overall German ability; say so if the learner asks.
+No tool checks your corrections; they are your own judgment. When you are not sure, say so and offer the change as a suggestion instead of recording it. Never invent CLI output, dates, times, or counts. Never make a CEFR claim, and never predict an exam result: the points of a practice exam are your rating against published criteria, and the report says so. Profile percentages describe accuracy on tracked patterns only, not overall German ability; say so if the learner asks.
 
 ## Resources
 
@@ -283,4 +297,5 @@ No tool checks your corrections; they are your own judgment. When you are not su
 - [CLI contract](references/cli-contract.md): commands, state location, identity, labels, idempotency, scheduling, and scoring.
 - [Learning loop](references/learning-loop.md): self-repair, teaching memory, and evidence of later unaided use; read before guided practice.
 - [Missions](references/missions.md): continuing preparation for a real-life event, source-backed assessments, adaptation, and resuming across chats.
+- [Practice exams](references/exams.md): the writing part of Goethe, telc, and DTZ exams under exam conditions, rating, and the report.
 - [Onboarding](references/onboarding.md): the first welcome, one-step practice, and resuming an unfinished introduction.
