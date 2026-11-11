@@ -48,7 +48,7 @@ Fehler aus deinen Texten: 3 Muster
 Diese Muster kommen in deiner Wiederholung in neuen Sätzen zurück.
 ```
 
-This report is real engine output for a scripted learner; the ratings and notes in it were written for the example.
+This report is real engine output for a scripted learner; the ratings and notes in it were written for the example. For a whole exam rated by an actual Claude Code tutor, see the [recorded Goethe B1 exam](../demo/exam.md).
 
 ## The formats
 

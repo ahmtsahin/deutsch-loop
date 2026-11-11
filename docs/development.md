@@ -71,9 +71,11 @@ python scripts/render_demo_gif.py --story conversation
 python scripts/render_demo_gif.py --story board
 python scripts/render_demo_gif.py --story session
 python scripts/render_demo_gif.py --story social
+python scripts/render_demo_gif.py --story exam-start
+python scripts/render_demo_gif.py --story exam-report
 ```
 
-Each story command writes a GIF and a static PNG under `demo/`. Three stories write a single PNG: `board` is a 1600 × 900 image of the four-month learner's session board, `session` is the README's opening image, drawn from the [recorded session](../demo/session.json), and `social` is the board at 1280 × 640 for the repository's social preview (Settings → General → Social preview). Review ladders and comeback markers are drawn, so any monospaced font renders them. Pass `--frames-dir demo-home/frames` to inspect every complete scene at its full size and at the 309 px width used in the mobile review. Text that exceeds the layout raises an error instead of being silently clipped or shrunk.
+Each story command writes a GIF and a static PNG under `demo/`. Five stories write a single PNG: `board` is a 1600 × 900 image of the four-month learner's session board, `session` is the README's opening image, drawn from the [recorded session](../demo/session.json), `social` is the board at 1280 × 640 for the repository's social preview (Settings → General → Social preview), and `exam-start` and `exam-report` are drawn from the [recorded exam](../demo/exam.json). Review ladders and comeback markers are drawn, so any monospaced font renders them. Pass `--frames-dir demo-home/frames` to inspect every complete scene at its full size and at the 309 px width used in the mobile review. Text that exceeds the layout raises an error instead of being silently clipped or shrunk.
 
 The learning-loop story opens on the result and lasts 11 seconds. The history story opens on the returning mistake and lasts 9 seconds. Both use scripted learner inputs and actual engine state, with dates anchored to the render day. The conversation replay lasts 16 seconds and reveals each learner message before its tutor reply.
 
@@ -130,6 +132,38 @@ The script makes two real host calls and uses the same isolation as the conversa
 ```bash
 python scripts/render_demo_gif.py --story session --transcript demo-home/new-session.json --output demo-home/new-session.png
 ```
+
+## Record a practice exam
+
+The README's exam images come from a real Goethe B1 exam in Claude Code. The tutor writes the tasks, so the learner's texts are written after the first reply. The engine's clock is real and cannot be set; `--not-before` waits until that many minutes after the start before sending, so the report shows a plausible time:
+
+```bash
+python evals/record_exam.py
+```
+
+```bash
+python evals/record_exam.py --resume-run demo-home/exam-XXXXXXXX --say-file texts.txt --not-before 46
+```
+
+```bash
+python evals/record_exam.py --resume-run demo-home/exam-XXXXXXXX --say "Abgeben"
+```
+
+```bash
+python evals/record_exam.py --resume-run demo-home/exam-XXXXXXXX --output demo-home/new-exam.json
+```
+
+The script makes one real host call per message and uses the same isolation as the other captures. The export fails if the opening does not show the engine's exam card or if the last reply does not show the engine's report exactly as printed. Render both images from the new recording:
+
+```bash
+python scripts/render_demo_gif.py --story exam-start --transcript demo-home/new-exam.json --output demo-home/exam-start.png
+```
+
+```bash
+python scripts/render_demo_gif.py --story exam-report --transcript demo-home/new-exam.json --output demo-home/exam-report.png
+```
+
+The renderer checks that every task, the card, and the report appear in the recorded replies. The report image underlines the words that differ between each sentence and its correction, and adds the tutor's text after the report in a second panel.
 
 ## Plugin manifests
 

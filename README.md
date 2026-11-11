@@ -15,7 +15,17 @@ It runs inside Claude Code and Codex. Every mistake is filed under its root caus
 
 **A new chat, four months in.** The tutor shows what is due, quotes a sentence you got wrong yesterday, and asks for a new one. This is an actual Claude Code reply to a scripted learner with four months of history. [Read the whole session](demo/session.md).
 
-**New:** [Practise while Claude works](#new-practise-while-claude-works) · [Install](#install) · [Why not just a chatbot?](#why-not-just-ask-a-chatbot) · [What you can do](#what-you-can-do) · [Demos](#goal-preparation-demo) · [How it works](#how-it-works)
+**New:** [Practice exams](#new-practice-exams) · [Practise while Claude works](#new-practise-while-claude-works) · [Install](#install) · [Why not just a chatbot?](#why-not-just-ask-a-chatbot) · [What you can do](#what-you-can-do) · [Demos](#goal-preparation-demo) · [How it works](#how-it-works)
+
+## New: practice exams
+
+Say „Goethe B1 Schreiben üben“ and you write the writing part of the exam under its real conditions. The tutor writes new tasks in the format of the real paper, and the engine keeps the clock. Until you hand in, there is no help and no correction. Then the tutor rates each text by the exam's own criteria, the engine turns the ratings into points with the exam's own table, and every mistake joins your FehlerDNA. Goethe B1/B2, telc B1/B2, and the Deutsch-Test für Zuwanderer are included.
+
+<p align="center">
+<a href="demo/exam-report.png"><img src="demo/exam-report.png" width="820" alt="The report of a Goethe B1 writing practice exam: 46 minutes 18 seconds of 60, without help. Task 1, a personal e-mail of 83 words, 32.5 of 40 points; task 2, a forum post of 83 words, 32.5 of 40; task 3, a short polite e-mail of 45 words, 17 of 20. Each task has its four rating bands and a note from the tutor. Result: 82 of 100 points, above the module's 60 percent pass mark, marked as a practice estimate, not an official result. Four mistake patterns follow, each with the learner's sentence and its correction: the verb in second position, twice; einen Salat in the accusative; teilnehmen an with the dative; and the verb at the end after weil. Below, the tutor names the two changes that would add the most points."></a>
+</p>
+
+**A Goethe B1 practice exam: 82 of 100 points.** An actual Claude Code tutor wrote [three new tasks](demo/exam-start.png), stored the texts without comment, rated them, and showed the engine's report. The learner's texts were scripted, with typical B1 mistakes. The result is a practice estimate against the published criteria, not an official score. [Read the whole exam](demo/exam.md) · [Exam guide](docs/exams.md)
 
 ## New: practise while Claude works
 
@@ -354,6 +364,8 @@ This uses a fresh demo directory. For the four-month story, run `python scripts/
 ## About the demos
 
 Learner messages are scripted so that every demo can be reproduced. The opening image and the first-day story show actual Claude Code replies. They were recorded under the project's old name, DeutschDNA, and only the name was changed afterwards; the board in the opening image now reads FehlerDNA. Boards, dates, counts, and histories come from the engine. The four-month history is seeded through the engine by `scripts/demo.py`; nobody waited four months for it.
+
+The practice exam was recorded on 11 November 2026 with an empty state directory. The tasks, ratings, notes, and advice are the tutor's, and the report is the engine's, printed unchanged. The learner's texts were written beforehand with deliberate mistakes. The engine's clock cannot be set, so the texts were sent 46 minutes after the start: the time in the report is real elapsed time.
 
 In the companion section, the FehlerDNA rows and the pattern story are real engine output for that scripted learner, with due times from the day they were rendered. The card, the status line, and the scene pane show the companion's layouts with example text, as does the short restaurant exchange; the Hilfe hint is the tutor's reply from a real session.
 

@@ -278,6 +278,193 @@ def render_session(session: dict, font_path: Path) -> Image.Image:
     return image
 
 
+EXAM_MONO, EXAM_LINE, EXAM_PAD = 30, 44, 44
+
+
+def collect_exam(source: Path) -> dict:
+    """A recorded practice exam: the opening reply with the engine's card and tasks, and the final report."""
+    recording = json.loads(source.read_text(encoding="utf-8"))
+    opening, closing = recording["exchanges"][0]["tutor"], recording["exchanges"][-1]["tutor"]
+    card, report = recording["card"], recording["report"]
+    if card not in opening:
+        raise ValueError("The recorded opening does not show the engine's exam card")
+    if report not in closing:
+        raise ValueError("The recorded final reply does not show the engine's report as printed")
+    for task in recording["tasks"]:
+        if task["prompt"] not in plain(opening):
+            raise ValueError(f"The recorded opening does not show task {task['number']} as it was saved")
+    lead = plain(opening.partition("```")[0])
+    after = plain(closing.partition(report)[2].replace("```", ""))
+    return {"lead": lead, "card": card.splitlines(), "tasks": recording["tasks"], "report": report.splitlines(),
+            "after": [text for text in after.split("\n\n") if text.strip()], "models": recording["models"]}
+
+
+def marked_words(original: str, corrected: str, side: str) -> list[tuple[str, bool]]:
+    """The words of one side of a correction, marked where the two versions differ, ignoring punctuation.
+
+    One comparison serves both sides, so a moved word is marked in both sentences.
+    """
+    import difflib
+    sides = {"original": original.split(), "corrected": corrected.split()}
+    clean = {key: [word.strip(".,?!:;" + QUOTATION_MARKS) for word in words] for key, words in sides.items()}
+    matcher = difflib.SequenceMatcher(None, clean["original"], clean["corrected"], autojunk=False)
+    marked = [True] * len(sides[side])
+    for block in matcher.get_matching_blocks():
+        start = block.a if side == "original" else block.b
+        for index in range(start, start + block.size):
+            marked[index] = False
+    return list(zip(sides[side], marked))
+
+
+def flow(draw: ImageDraw.ImageDraw | None, items: list[dict], left: float, top: int, width: float,
+         font: ImageFont.FreeTypeFont, line_height: int) -> int:
+    """Lay out styled words with wrapping and a hanging indent; without `draw`, only measure. Returns the end y."""
+    cell = font.getlength(" ")
+    y = top
+    for item in items:
+        words = item["words"]
+        if not words:
+            y += line_height
+            continue
+        start = left + item.get("indent", 0) * cell
+        x = start
+        for text, color, underline in words:
+            size = font.getlength(text)
+            if x > start and x + size > left + width:
+                y += line_height
+                x = start = left + (item.get("indent", 0) + item.get("hang", 0)) * cell
+            if size > left + width - x:
+                raise ValueError(f"A word does not fit the exam image: {text!r}")
+            if draw:
+                draw.text((x, y), text, font=font, fill=COLORS[color])
+                if underline:
+                    bare = text.rstrip(".,?!:;" + QUOTATION_MARKS)
+                    draw.line((x, y + line_height - 6, x + font.getlength(bare), y + line_height - 6),
+                              fill=COLORS[color], width=3)
+            x += size + cell
+        y += line_height
+    return y
+
+
+def styled(text: str, color: str, indent: int = 0, hang: int = 0, marks: list[bool] | None = None) -> dict:
+    words = text.split()
+    return {"words": [(word, color, bool(marks and marks[index])) for index, word in enumerate(words)],
+            "indent": indent, "hang": hang}
+
+
+def blank() -> dict:
+    return {"words": []}
+
+
+def exam_report_items(lines: list[str]) -> list[dict]:
+    """The engine's report, line by line, in the colours of the other README images."""
+    items = []
+    for index, line in enumerate(lines):
+        body = line.lstrip()
+        indent = len(line) - len(body)
+        following = lines[index + 1].lstrip() if index + 1 < len(lines) else ""
+        if not body:
+            items.append(blank())
+        elif index == 0 or body.startswith(("Übungsergebnis", "Fehler aus deinen Texten")):
+            items.append(styled(body, "accent", indent))
+        elif "  →  " in body and body.endswith("Punkten"):
+            bands, score = body.split("  →  ")
+            item = styled(f"{bands} →", "text", indent, 2)
+            item["words"] += [(word, "accent", False) for word in score.split()]
+            items.append(item)
+        elif body.startswith("→ "):
+            original = lines[index - 1].strip()
+            pairs = marked_words(original, body[2:], "corrected")
+            item = styled("→", "green", indent, 2)
+            item["words"] += [(word, "green", mark) for word, mark in pairs]
+            items.append(item)
+        elif following.startswith("→ ") and indent:
+            pairs = marked_words(body, following[2:], "original")
+            items.append({"words": [(word, "red", mark) for word, mark in pairs], "indent": indent})
+        elif re.match(r"\d+\. ", body):
+            label, _, count = body.partition(" · ")
+            item = styled(label, "text", indent, 3)
+            if count:
+                item["words"] += [(word, "muted", False) for word in f"· {count}".split()]
+            items.append(item)
+        elif re.match(r"Aufgabe \d+ · ", body):
+            items.append(styled(body, "text", indent, 2))
+        elif body.endswith("· erreicht"):
+            items.append(styled(body, "green", indent))
+        else:
+            items.append(styled(body, "muted", indent, 0))
+    return items
+
+
+def render_exam_page(stage: str, heading: str, panels: list[tuple[str | None, list[dict]]], footer: str,
+                     disclosure: str, font_path: Path) -> Image.Image:
+    """One or more panels under the usual header; a panel may carry a small label above it."""
+    width = 1600
+    label = ImageFont.truetype(str(font_path), 30)
+    title = ImageFont.truetype(str(font_path), 64)
+    mono = ImageFont.truetype(str(font_path), EXAM_MONO)
+    inner = width - 128 - 2 * EXAM_PAD
+    if title.getlength(heading) > width - 128 or label.getlength(footer) > width - 128:
+        raise ValueError("The exam heading or footer is too wide")
+
+    def lay_out(draw: ImageDraw.ImageDraw | None) -> int:
+        top = 262
+        for caption, items in panels:
+            if caption:
+                if draw:
+                    draw.text((64, top), caption, font=label, fill=COLORS["blue"])
+                top += 52
+            bottom = flow(None, items, 64 + EXAM_PAD, top + 40, inner, mono, EXAM_LINE) + 26
+            if draw:
+                draw.rounded_rectangle((64, top, width - 64, bottom), radius=24, fill=COLORS["panel"],
+                                       outline=COLORS["border"], width=2)
+                flow(draw, items, 64 + EXAM_PAD, top + 40, inner, mono, EXAM_LINE)
+            top = bottom + 40
+        return top - 40
+
+    bottom = lay_out(None)
+    image = Image.new("RGB", (width, bottom + 140), COLORS["page"])
+    draw = ImageDraw.Draw(image)
+    draw_header(draw, width, stage, heading, label, title)
+    lay_out(draw)
+    draw.text((64, bottom + 34), footer, font=label, fill=COLORS["text"])
+    draw.text((64, bottom + 78), disclosure, font=label, fill=COLORS["muted"])
+    return image
+
+
+def render_exam_start(exam: dict, font_path: Path) -> Image.Image:
+    items = [styled(exam["lead"], "text"), blank()]
+    for index, line in enumerate(exam["card"]):
+        items.append(styled(line, "accent" if index == 0 else "muted" if index == len(exam["card"]) - 1 else "text"))
+    for task in exam["tasks"]:
+        number, _, rest = task["prompt"].partition(" ")
+        head, _, rest = rest.partition(" ")
+        items += [blank(), {"words": [(f"{number} {head}", "accent", False)]
+                            + [(word, "text", False) for word in rest.split()]}]
+    return render_exam_page("PRACTICE EXAM / GOETHE-ZERTIFIKAT B1", "New tasks. The clock runs.", [(None, items)],
+                            "Three new tasks in the real format. No help until „Abgeben“.",
+                            "Actual Claude Code reply / the tutor wrote the tasks", font_path)
+
+
+def render_exam_report(exam: dict, font_path: Path) -> Image.Image:
+    advice = []
+    for paragraph in exam["after"]:
+        for line in paragraph.splitlines():
+            if line.startswith("- "):
+                head, colon, rest = line[2:].partition(":")
+                item = styled(f"- {head}{colon}", "blue", 0, 2)
+                item["words"] += [(word, "text", False) for word in rest.split()]
+                advice.append(item)
+            else:
+                advice.append(styled(line, "text" if line.endswith(":") else "muted"))
+        advice.append(blank())
+    panels = [(None, exam_report_items(exam["report"]))] + ([("THE TUTOR, RIGHT AFTER THE REPORT", advice[:-1])]
+                                                             if advice else [])
+    return render_exam_page("AFTER „ABGEBEN“", "Rated by the exam's own scheme.", panels,
+                            "Bands from the tutor, points from Goethe's table, mistakes into reviews.",
+                            "Actual Claude Code tutor / scripted learner texts / not an official result", font_path)
+
+
 def plain(text: str) -> str:
     """Remove emphasis markers for the visual replay, preserving the actual words."""
     return re.sub(r"[*_`]", "", text).strip()
@@ -384,7 +571,8 @@ def render_frame(screen: dict, index: int, count: int, font_path: Path, *,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--story", choices=("history", "learning-loop", "conversation", "board", "session", "social"),
+    parser.add_argument("--story", choices=("history", "learning-loop", "conversation", "board", "session", "social",
+                                            "exam-start", "exam-report"),
                         default="learning-loop")
     parser.add_argument("--output", type=Path,
                         help="Output GIF; a static PNG is saved beside it (board, session, social: the PNG itself)")
@@ -394,10 +582,14 @@ def main(argv: list[str] | None = None) -> int:
                         help="Recording to replay (default: demo/conversation.json, or demo/session.json for session)")
     arguments = parser.parse_args(argv)
     font = find_font(arguments.font)
-    if arguments.story in ("board", "session", "social"):
+    if arguments.story in ("board", "session", "social", "exam-start", "exam-report"):
         output = arguments.output or ROOT / "demo" / f"{arguments.story}.png"
         output.parent.mkdir(parents=True, exist_ok=True)
-        if arguments.story == "board":
+        if arguments.story.startswith("exam-"):
+            exam = collect_exam(arguments.transcript or ROOT / "demo" / "exam.json")
+            render = render_exam_start if arguments.story == "exam-start" else render_exam_report
+            image, name = render(exam, font), "recorded practice exam"
+        elif arguments.story == "board":
             image, name = render_board(*collect_board(), font), "session board"
         elif arguments.story == "social":
             image, name = render_social(collect_board()[1], font), "social preview"
